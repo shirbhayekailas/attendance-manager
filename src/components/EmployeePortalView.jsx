@@ -447,10 +447,12 @@ export default function EmployeePortalView({
                       entry.status === 'present' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
                       entry.status === 'wfh' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' :
                       entry.status === 'late' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
+                      (entry.status === 'week_off' || entry.status === 'wo') ? 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300' :
+                      entry.status === 'half_day' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300' :
                       entry.status === 'leave' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' :
                       'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
                     }`}>
-                      {entry.status}
+                      {(entry.status === 'week_off' || entry.status === 'wo') ? 'Week Off' : entry.status}
                     </span>
                   </div>
                 ))
@@ -478,6 +480,7 @@ export default function EmployeePortalView({
         let mHalfDay = 0;
         let mLeave = 0;
         let mAbsent = 0;
+        let mWeekOff = 0;
 
         for (let d = 1; d <= daysInSelectedMonth; d++) {
           const dObj = new Date(selectedYear, selectedMonth, d);
@@ -493,6 +496,7 @@ export default function EmployeePortalView({
           else if (status === 'half_day') mHalfDay++;
           else if (status === 'leave') mLeave++;
           else if (status === 'absent') mAbsent++;
+          else if (status === 'week_off' || status === 'wo') mWeekOff++;
 
           monthlyDayList.push({
             dayNum: d,
@@ -509,7 +513,7 @@ export default function EmployeePortalView({
           });
         }
 
-        const mPayable = mOffice + mWfh + mLeave + (0.5 * mHalfDay);
+        const mPayable = mOffice + mWfh + mLeave + mWeekOff + (0.5 * mHalfDay);
 
         return (
           <div className="space-y-6">
@@ -611,14 +615,22 @@ export default function EmployeePortalView({
               </div>
             </div>
 
-            {/* Official Corporate Print Header */}
+            {/* Official Corporate Print Header - SK ENTERPRISES LETTERHEAD */}
             <div className="print-only hidden p-5 mb-4 border-b-2 border-slate-900 bg-white text-slate-900">
               <div className="flex justify-between items-start">
                 <div>
-                  <h1 className="text-xl font-black uppercase tracking-tight">
-                    {config?.companyName || 'AttendFlow Enterprise Solutions Ltd.'}
-                  </h1>
-                  <p className="text-xs font-bold text-slate-800">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                      SK
+                    </div>
+                    <h1 className="text-xl font-black uppercase tracking-tight text-slate-950">
+                      {config?.companyName || 'SK ENTERPRISES'}
+                    </h1>
+                  </div>
+                  <p className="text-[10px] text-slate-700 font-medium max-w-xl">
+                    {config?.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
+                  </p>
+                  <p className="text-xs font-bold text-slate-900 mt-1">
                     EMPLOYEE MONTHLY ATTENDANCE STATEMENT &amp; TIMESHEET
                   </p>
                   <p className="text-[10px] text-slate-500">
@@ -875,7 +887,7 @@ export default function EmployeePortalView({
                   My Official Salary Statement
                 </h3>
                 <p className="text-xs text-slate-400">
-                  {config?.companyName || 'AttendFlow Enterprise Solutions Ltd.'} • September 2026
+                  {config?.companyName || 'SK ENTERPRISES'} • September 2026
                 </p>
               </div>
 

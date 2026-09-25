@@ -75,6 +75,7 @@ export function calculateEmployeeStats(empId, attendanceData, baseSalary = 10000
   let halfDay = 0;
   let paidLeave = 0;
   let unpaidAbsent = 0;
+  let weekOff = 0;
   let totalOvertimeHours = 0;
 
   const logs = [];
@@ -102,6 +103,7 @@ export function calculateEmployeeStats(empId, attendanceData, baseSalary = 10000
       } else if (status === "half_day") halfDay++;
       else if (status === "leave") paidLeave++;
       else if (status === "absent") unpaidAbsent++;
+      else if (status === "week_off" || status === "wo") weekOff++;
 
       logs.push({
         date,
@@ -115,8 +117,8 @@ export function calculateEmployeeStats(empId, attendanceData, baseSalary = 10000
     }
   });
 
-  // Payable Days = In-Office + WFH + Paid Leaves + 0.5 * HalfDay
-  const payableDays = inOffice + wfh + paidLeave + (halfDay * 0.5);
+  // Payable Days = In-Office + WFH + Paid Leaves + Week Offs + 0.5 * HalfDay
+  const payableDays = inOffice + wfh + paidLeave + weekOff + (halfDay * 0.5);
 
   // Overall Attendance Percentage
   const attendanceRate = totalWorkingDays > 0 ? Number(((payableDays / totalWorkingDays) * 100).toFixed(1)) : 0;
@@ -153,6 +155,7 @@ export function calculateEmployeeStats(empId, attendanceData, baseSalary = 10000
     halfDay,
     paidLeave,
     unpaidAbsent,
+    weekOff,
     totalOvertimeHours: Number(totalOvertimeHours.toFixed(1)),
     payableDays,
     attendanceRate,
@@ -175,6 +178,7 @@ export function getCompanyDailyOverview(dateStr, employees, attendanceData) {
   let halfDay = 0;
   let onLeave = 0;
   let absent = 0;
+  let weekOff = 0;
   let unmarked = 0;
 
   employees.forEach((emp) => {
@@ -191,6 +195,7 @@ export function getCompanyDailyOverview(dateStr, employees, attendanceData) {
       else if (rec.status === "half_day") halfDay++;
       else if (rec.status === "leave") onLeave++;
       else if (rec.status === "absent") absent++;
+      else if (rec.status === "week_off" || rec.status === "wo") weekOff++;
     }
   });
 
@@ -209,6 +214,7 @@ export function getCompanyDailyOverview(dateStr, employees, attendanceData) {
     halfDay,
     onLeave,
     absent,
+    weekOff,
     unmarked,
     presentTotal,
     attendancePercentage,

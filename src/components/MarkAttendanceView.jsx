@@ -87,6 +87,11 @@ export default function MarkAttendanceView({
 
       if (status === 'wfh') {
         note = "Approved Work From Home";
+      } else if (status === 'week_off') {
+        clockIn = "--";
+        clockOut = "--";
+        workingHours = "0h 00m";
+        note = "Scheduled Week Off (WO)";
       } else if (status === 'leave') {
         clockIn = "--";
         clockOut = "--";
@@ -111,7 +116,7 @@ export default function MarkAttendanceView({
 
     setAttendance({ ...attendance, [selectedDate]: updatedDay });
     sounds.playSuccess();
-    onSaveToast(`Updated ${targetIds.length} staff members to ${status.toUpperCase()}!`);
+    onSaveToast(`Updated ${targetIds.length} staff members to ${status === 'week_off' ? 'WEEK OFF' : status.toUpperCase()}!`);
     setSelectedIds([]);
   };
 
@@ -124,7 +129,12 @@ export default function MarkAttendanceView({
     let workingHours = "9h 05m";
     let note = currentRec.note || "";
 
-    if (status === 'leave') {
+    if (status === 'week_off') {
+      clockIn = "--";
+      clockOut = "--";
+      workingHours = "0h 00m";
+      note = note || "Scheduled Week Off (WO)";
+    } else if (status === 'leave') {
       clockIn = "--";
       clockOut = "--";
       workingHours = "0h 00m";
@@ -191,6 +201,7 @@ export default function MarkAttendanceView({
   let halfDay = 0;
   let onLeave = 0;
   let absent = 0;
+  let weekOff = 0;
   let markedCount = 0;
 
   filteredEmployees.forEach((emp) => {
@@ -202,11 +213,12 @@ export default function MarkAttendanceView({
       else if (rec.status === 'half_day') halfDay++;
       else if (rec.status === 'leave') onLeave++;
       else if (rec.status === 'absent') absent++;
+      else if (rec.status === 'week_off' || rec.status === 'wo') weekOff++;
     }
   });
 
   const dayPercentage = markedCount > 0
-    ? Number(((inOffice + wfh + (halfDay * 0.5)) / markedCount * 100).toFixed(1))
+    ? Number(((inOffice + wfh + weekOff + (halfDay * 0.5)) / markedCount * 100).toFixed(1))
     : 0;
 
   return (
@@ -316,6 +328,15 @@ export default function MarkAttendanceView({
           </button>
 
           <button
+            onClick={() => handleBulkStatusSelected('week_off')}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/70 dark:border-sky-800/60 transition-all active:scale-95"
+            title="Mark Selected or All Staff as Week Off"
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>Mark {selectedIds.length > 0 ? `(${selectedIds.length})` : 'All'} Week Off</span>
+          </button>
+
+          <button
             onClick={() => {
               if (window.confirm(`Clear attendance for ${selectedDate}?`)) {
                 const updated = { ...attendance };
@@ -373,14 +394,22 @@ export default function MarkAttendanceView({
         </div>
       </div>
 
-      {/* Official Print Header */}
+      {/* Official Print Header - SK ENTERPRISES LETTERHEAD */}
       <div className="print-only hidden p-5 mb-4 border-b-2 border-slate-900 bg-white text-slate-900">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-xl font-black uppercase tracking-tight">
-              {config?.companyName || 'AttendFlow Enterprise Solutions Ltd.'}
-            </h1>
-            <p className="text-xs font-bold text-slate-800">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                SK
+              </div>
+              <h1 className="text-xl font-black uppercase tracking-tight text-slate-950">
+                {config?.companyName || 'SK ENTERPRISES'}
+              </h1>
+            </div>
+            <p className="text-[10px] text-slate-700 font-medium max-w-xl">
+              {config?.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
+            </p>
+            <p className="text-xs font-bold text-slate-900 mt-1">
               DAILY EMPLOYEE ATTENDANCE ROSTER &amp; SHIFT LOG
             </p>
             <p className="text-[10px] text-slate-500">
@@ -535,6 +564,20 @@ export default function MarkAttendanceView({
                           <span className="hidden sm:inline">WFH</span>
                         </button>
 
+                        {/* Week Off (WO) */}
+                        <button
+                          onClick={() => handleSetStatus(emp.id, 'week_off')}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                            status === 'week_off' || status === 'wo'
+                              ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30 scale-105'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-sky-600'
+                          }`}
+                          title="Weekly Off (WO)"
+                        >
+                          <CalendarDays className="w-3.5 h-3.5" />
+                          <span>WO</span>
+                        </button>
+
                         {/* Half Day */}
                         <button
                           onClick={() => handleSetStatus(emp.id, 'half_day')}
@@ -582,12 +625,13 @@ export default function MarkAttendanceView({
                           <span className={`px-2.5 py-1 rounded font-bold text-xs ${
                             status === 'present' ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
                             status === 'wfh' ? 'bg-indigo-100 text-indigo-900 border border-indigo-300' :
+                            (status === 'week_off' || status === 'wo') ? 'bg-sky-100 text-sky-900 border border-sky-300' :
                             status === 'late' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
                             status === 'half_day' ? 'bg-yellow-100 text-yellow-900 border border-yellow-300' :
                             status === 'leave' ? 'bg-purple-100 text-purple-900 border border-purple-300' :
                             'bg-rose-100 text-rose-900 border border-rose-300'
                           }`}>
-                            {status.replace('_', ' ').toUpperCase()}
+                            {(status === 'week_off' || status === 'wo') ? 'WEEK OFF' : status.replace('_', ' ').toUpperCase()}
                           </span>
                         ) : (
                           <span className="text-slate-400">NOT MARKED</span>

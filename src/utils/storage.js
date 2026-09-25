@@ -11,7 +11,8 @@ const STORAGE_KEYS = {
 };
 
 export const defaultCompanyConfig = {
-  companyName: "Acme Global Technologies Pvt. Ltd.",
+  companyName: "SK ENTERPRISES",
+  companyAddress: "303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208",
   shiftStart: "09:30 AM",
   shiftEnd: "06:30 PM",
   graceMinutes: 15,

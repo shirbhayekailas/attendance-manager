@@ -99,9 +99,11 @@ export default function DashboardView({
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-            {config.companyName}
+            {config.companyName || 'SK ENTERPRISES'}
           </h1>
-
+          <p className="text-xs text-blue-200/90 font-medium max-w-xl">
+            {config.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
+          </p>
           <p className="text-xs sm:text-sm text-slate-300 max-w-xl leading-relaxed">
             Enterprise attendance intelligence, real-time desk occupancy analytics, biometric punch logs, and automated payroll payable days ledger.
           </p>

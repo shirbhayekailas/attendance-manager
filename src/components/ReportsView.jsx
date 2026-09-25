@@ -48,6 +48,7 @@ export default function ReportsView({
     let rangeHalfDay = 0;
     let rangeLeave = 0;
     let rangeAbsent = 0;
+    let rangeWeekOff = 0;
     let rangeLate = 0;
     let rangeOvertime = 0;
 
@@ -69,10 +70,11 @@ export default function ReportsView({
         else if (rec.status === 'half_day') rangeHalfDay++;
         else if (rec.status === 'leave') rangeLeave++;
         else if (rec.status === 'absent') rangeAbsent++;
+        else if (rec.status === 'week_off' || rec.status === 'wo') rangeWeekOff++;
       }
     });
 
-    const payableDays = rangeOffice + rangeWFH + rangeLeave + (rangeHalfDay * 0.5);
+    const payableDays = rangeOffice + rangeWFH + rangeLeave + rangeWeekOff + (rangeHalfDay * 0.5);
     const overallStats = calculateEmployeeStats(emp.id, attendance, emp.salaryMonthly || 100000, 22);
     const advanceAmount = getEmployeeTotalAdvance(emp.id, advances);
     const netDisbursal = Math.max(0, overallStats.netEstimatedSalary - advanceAmount);
@@ -85,6 +87,7 @@ export default function ReportsView({
       rangeHalfDay,
       rangeLeave,
       rangeAbsent,
+      rangeWeekOff,
       rangeLate,
       rangeOvertime: Number(rangeOvertime.toFixed(1)),
       payableDays,
@@ -118,6 +121,7 @@ export default function ReportsView({
       'Total Sessions', 
       'In-Office Days', 
       'WFH Days', 
+      'Week Off Days',
       'Half Days', 
       'Paid Leaves', 
       'LWP (Loss of Pay)', 
@@ -139,6 +143,7 @@ export default function ReportsView({
       e.rangeTotal,
       e.rangeOffice,
       e.rangeWFH,
+      e.rangeWeekOff,
       e.rangeHalfDay,
       e.rangeLeave,
       e.rangeAbsent,
@@ -321,11 +326,31 @@ export default function ReportsView({
         </div>
       </div>
 
-      {/* Official Print Header */}
-      <div className="print-only hidden p-6 border-b-2 border-black mb-4">
-        <h1 className="text-2xl font-black uppercase tracking-wide">{config.companyName}</h1>
-        <p className="text-sm font-semibold">Official Payroll & Attendance Register • Fiscal Year 2026-2027</p>
-        <p className="text-xs text-gray-600">Generated on {new Date().toLocaleDateString()} • Statutory Standard: 22 Working Days Base</p>
+      {/* Official Print Header - SK ENTERPRISES LETTERHEAD */}
+      <div className="print-only hidden p-6 border-b-2 border-slate-900 mb-4 bg-white text-slate-900">
+        <div className="flex justify-between items-start">
+          <div>
+            <div className="flex items-center gap-2.5 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                SK
+              </div>
+              <h1 className="text-xl font-black uppercase tracking-tight text-slate-950">
+                {config?.companyName || 'SK ENTERPRISES'}
+              </h1>
+            </div>
+            <p className="text-[10px] text-slate-700 font-medium max-w-xl">
+              {config?.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
+            </p>
+            <p className="text-xs font-bold text-slate-900 mt-1">Official Payroll &amp; Attendance Register • Fiscal Year 2026-2027</p>
+            <p className="text-[10px] text-slate-500">Generated on {new Date().toLocaleDateString()} • Statutory Standard: 22 Working Days Base</p>
+          </div>
+          <div className="text-right text-xs space-y-1">
+            <div className="inline-block px-2.5 py-0.5 rounded bg-slate-950 text-white font-mono text-[9px] font-black uppercase tracking-wider">
+              CONFIDENTIAL HR PAYROLL
+            </div>
+            <p className="font-bold text-slate-900 text-xs">Total Staff: {displayedEmployees.length}</p>
+          </div>
+        </div>
       </div>
 
       {/* TAB 1: PAYROLL SUMMARY REGISTER */}
@@ -336,9 +361,10 @@ export default function ReportsView({
               <thead>
                 <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
                   <th className="py-3.5 px-4">Employee</th>
-                  <th className="py-3.5 px-4">Department & Role</th>
+                  <th className="py-3.5 px-4">Department &amp; Role</th>
                   <th className="py-3.5 px-4 text-center">In Office</th>
                   <th className="py-3.5 px-4 text-center">WFH</th>
+                  <th className="py-3.5 px-4 text-center text-sky-600 dark:text-sky-400">Week Off</th>
                   <th className="py-3.5 px-4 text-center">Paid Leaves</th>
                   <th className="py-3.5 px-4 text-center">LWP</th>
                   <th className="py-3.5 px-4 text-center">OT Hours</th>
@@ -377,6 +403,10 @@ export default function ReportsView({
 
                     <td className="py-3 px-4 text-center font-bold text-indigo-500">
                       {emp.rangeWFH}d
+                    </td>
+
+                    <td className="py-3 px-4 text-center font-bold text-sky-600 dark:text-sky-400">
+                      {emp.rangeWeekOff}d
                     </td>
 
                     <td className="py-3 px-4 text-center font-bold text-purple-500">
@@ -496,6 +526,10 @@ export default function ReportsView({
                           ) : status === 'leave' ? (
                             <span className="w-6 h-6 rounded-md inline-flex items-center justify-center font-black text-[10px] bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300">
                               V
+                            </span>
+                          ) : (status === 'week_off' || status === 'wo') ? (
+                            <span className="w-6 h-6 rounded-md inline-flex items-center justify-center font-black text-[9px] bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
+                              WO
                             </span>
                           ) : status === 'absent' ? (
                             <span className="w-6 h-6 rounded-md inline-flex items-center justify-center font-black text-[10px] bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">

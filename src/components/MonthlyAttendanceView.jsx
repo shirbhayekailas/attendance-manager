@@ -117,8 +117,8 @@ export default function MonthlyAttendanceView({
           status: newStatus,
           clockIn: (newStatus === 'present' || newStatus === 'late') ? '09:30 AM' : newStatus === 'wfh' ? '09:30 AM (WFH)' : '--',
           clockOut: (newStatus === 'present' || newStatus === 'wfh' || newStatus === 'late') ? '06:30 PM' : '--',
-          workingHours: (newStatus === 'present' || newStatus === 'wfh' || newStatus === 'late') ? '9h 00m' : newStatus === 'half_day' ? '4h 30m' : '--',
-          note: `Marked via Monthly Matrix`
+          workingHours: (newStatus === 'present' || newStatus === 'wfh' || newStatus === 'late') ? '9h 00m' : newStatus === 'half_day' ? '4h 30m' : (newStatus === 'week_off' || newStatus === 'leave' || newStatus === 'absent') ? '0h 00m' : '--',
+          note: newStatus === 'week_off' ? 'Scheduled Week Off (WO)' : `Marked via Monthly Matrix`
         }
       };
     }
@@ -131,7 +131,7 @@ export default function MonthlyAttendanceView({
     setAttendance(updated);
     sounds.playSuccess();
     setEditingCell(null);
-    onSaveToast(`Updated ${editingCell.empName} on ${dateStr} to ${newStatus.toUpperCase()}`);
+    onSaveToast(`Updated ${editingCell.empName} on ${dateStr} to ${newStatus === 'week_off' ? 'WEEK OFF' : newStatus.toUpperCase()}`);
   };
 
   // Helper to get status representation
@@ -152,6 +152,7 @@ export default function MonthlyAttendanceView({
     let halfDay = 0;
     let leave = 0;
     let absent = 0;
+    let weekOff = 0;
 
     monthDays.forEach(({ dateStr, isWeekend }) => {
       const rec = attendance[dateStr]?.[empId];
@@ -162,10 +163,11 @@ export default function MonthlyAttendanceView({
         else if (rec.status === 'half_day') halfDay++;
         else if (rec.status === 'leave') leave++;
         else if (rec.status === 'absent') absent++;
+        else if (rec.status === 'week_off' || rec.status === 'wo') weekOff++;
       }
     });
 
-    const payable = office + wfh + leave + (0.5 * halfDay);
+    const payable = office + wfh + leave + weekOff + (0.5 * halfDay);
 
     return {
       office,
@@ -174,6 +176,7 @@ export default function MonthlyAttendanceView({
       halfDay,
       leave,
       absent,
+      weekOff,
       payable,
     };
   };
@@ -181,7 +184,7 @@ export default function MonthlyAttendanceView({
   // Export Monthly CSV
   const handleExportMonthlyCSV = () => {
     sounds.playSuccess();
-    const headers = ['EMP ID', 'Name', 'Department', ...monthDays.map(d => `${d.dayNum}`), 'Office', 'WFH', 'Late', 'Leaves', 'Absent', 'Payable Days'];
+    const headers = ['EMP ID', 'Name', 'Department', ...monthDays.map(d => `${d.dayNum}`), 'Office', 'WFH', 'Week Off', 'Late', 'Leaves', 'Absent', 'Payable Days'];
     
     const rows = filteredEmployees.map(emp => {
       const stats = getEmpMonthlyStats(emp.id);
@@ -194,6 +197,8 @@ export default function MonthlyAttendanceView({
           case 'half_day': return 'HD';
           case 'leave': return 'LV';
           case 'absent': return 'A';
+          case 'week_off':
+          case 'wo':
           case 'weekend': return 'WO';
           default: return '-';
         }
@@ -206,6 +211,7 @@ export default function MonthlyAttendanceView({
         ...dayCodes,
         stats.office,
         stats.wfh,
+        stats.weekOff,
         stats.late,
         stats.leave,
         stats.absent,
@@ -369,24 +375,32 @@ export default function MonthlyAttendanceView({
         </div>
       </div>
 
-      {/* Official Corporate Print Header */}
+      {/* Official Corporate Print Header - SK ENTERPRISES LETTERHEAD */}
       <div className="print-only hidden p-4 mb-4 border-b-2 border-slate-900 bg-white text-slate-900">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-xl font-black uppercase tracking-tight">
-              {config?.companyName || 'AttendFlow Enterprise Solutions Ltd.'}
-            </h1>
-            <p className="text-xs font-bold text-slate-800">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                SK
+              </div>
+              <h1 className="text-xl font-black uppercase tracking-tight text-slate-950">
+                {config?.companyName || 'SK ENTERPRISES'}
+              </h1>
+            </div>
+            <p className="text-[10px] text-slate-700 font-medium max-w-xl">
+              {config?.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
+            </p>
+            <p className="text-xs font-bold text-slate-900 mt-1">
               OFFICIAL EMPLOYEE MONTHLY ATTENDANCE MUSTER ROLL REGISTER
             </p>
             <p className="text-[10px] text-slate-500">
-              Month & Year: <span className="font-bold text-slate-900 uppercase">{monthName} {selectedYear}</span> • Calendar Days: {daysInMonth}
+              Month &amp; Year: <span className="font-bold text-slate-900 uppercase">{monthName} {selectedYear}</span> • Calendar Days: {daysInMonth}
             </p>
           </div>
           <div className="text-right text-[10px] space-y-0.5">
             <p className="font-bold text-slate-900">Generated on: {new Date().toLocaleDateString()}</p>
             <p className="text-slate-600">Department: {selectedDept} • Total Employees: {filteredEmployees.length}</p>
-            <p className="text-slate-500">Codes: P (Office) | W (WFH) | L (Late) | LV (Leave) | HD (Half Day) | A (Absent)</p>
+            <p className="text-slate-500">Codes: P (Office) | W (WFH) | WO (Week Off) | L (Late) | LV (Leave) | HD (Half Day) | A (Absent)</p>
           </div>
         </div>
       </div>
@@ -415,19 +429,22 @@ export default function MonthlyAttendanceView({
                 ))}
 
                 {/* Monthly Totals Header */}
-                <th className="p-2.5 text-center font-bold text-emerald-600 dark:text-emerald-400 min-w-[48px] bg-emerald-50/50 dark:bg-emerald-950/20">
+                <th className="p-2 text-center font-bold text-emerald-600 dark:text-emerald-400 min-w-[38px] bg-emerald-50/50 dark:bg-emerald-950/20" title="Office Present">
                   P
                 </th>
-                <th className="p-2.5 text-center font-bold text-indigo-600 dark:text-indigo-400 min-w-[48px] bg-indigo-50/50 dark:bg-indigo-950/20">
+                <th className="p-2 text-center font-bold text-indigo-600 dark:text-indigo-400 min-w-[38px] bg-indigo-50/50 dark:bg-indigo-950/20" title="Work From Home">
                   W
                 </th>
-                <th className="p-2.5 text-center font-bold text-purple-600 dark:text-purple-400 min-w-[48px] bg-purple-50/50 dark:bg-purple-950/20">
+                <th className="p-2 text-center font-bold text-sky-600 dark:text-sky-400 min-w-[38px] bg-sky-50/50 dark:bg-sky-950/20" title="Week Off (WO)">
+                  WO
+                </th>
+                <th className="p-2 text-center font-bold text-purple-600 dark:text-purple-400 min-w-[38px] bg-purple-50/50 dark:bg-purple-950/20" title="Paid Leave">
                   LV
                 </th>
-                <th className="p-2.5 text-center font-bold text-rose-600 dark:text-rose-400 min-w-[48px] bg-rose-50/50 dark:bg-rose-950/20">
+                <th className="p-2 text-center font-bold text-rose-600 dark:text-rose-400 min-w-[38px] bg-rose-50/50 dark:bg-rose-950/20" title="Absent (LWP)">
                   A
                 </th>
-                <th className="p-3 text-center font-black text-slate-900 dark:text-white min-w-[70px] bg-slate-100/70 dark:bg-slate-800/70">
+                <th className="p-2.5 text-center font-black text-slate-900 dark:text-white min-w-[65px] bg-slate-100/70 dark:bg-slate-800/70" title="Total Payable Days">
                   Payable
                 </th>
               </tr>
@@ -517,6 +534,11 @@ export default function MonthlyAttendanceView({
                                 A
                               </span>
                             )}
+                            {(status === 'week_off' || status === 'wo') && (
+                              <span className="inline-block w-6 h-6 rounded-lg bg-sky-500 text-white font-bold text-[9px] leading-6 shadow-2xs">
+                                WO
+                              </span>
+                            )}
                             {status === 'weekend' && (
                               <span className="inline-block w-6 h-6 text-slate-300 dark:text-slate-600 font-mono text-[9px] leading-6">
                                 ·
@@ -538,13 +560,16 @@ export default function MonthlyAttendanceView({
                       <td className="p-2 text-center font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/30 dark:bg-indigo-950/10">
                         {stats.wfh}
                       </td>
+                      <td className="p-2 text-center font-bold text-sky-600 dark:text-sky-400 bg-sky-50/30 dark:bg-sky-950/10" title="Week Offs">
+                        {stats.weekOff}
+                      </td>
                       <td className="p-2 text-center font-bold text-purple-600 dark:text-purple-400 bg-purple-50/30 dark:bg-purple-950/10">
                         {stats.leave}
                       </td>
                       <td className="p-2 text-center font-bold text-rose-500 bg-rose-50/30 dark:bg-rose-950/10">
                         {stats.absent}
                       </td>
-                      <td className="p-2 text-center font-black text-slate-900 dark:text-white bg-slate-100/50 dark:bg-slate-800/40">
+                      <td className="p-2.5 text-center font-black text-slate-900 dark:text-white bg-slate-100/50 dark:bg-slate-800/40">
                         {stats.payable}d
                       </td>
                     </tr>
@@ -608,6 +633,14 @@ export default function MonthlyAttendanceView({
               >
                 <span className="w-3 h-3 rounded-full bg-indigo-500"></span>
                 <span>Work From Home</span>
+              </button>
+
+              <button
+                onClick={() => handleSetStatus('week_off')}
+                className="p-3 rounded-2xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/50 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 flex items-center gap-2 transition-all"
+              >
+                <span className="w-3 h-3 rounded-full bg-sky-500"></span>
+                <span>Week Off (WO)</span>
               </button>
 
               <button

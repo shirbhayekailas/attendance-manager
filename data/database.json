@@ -628,7 +628,8 @@
     }
   ],
   "config": {
-    "companyName": "Acme Global Tech"
+    "companyName": "SK ENTERPRISES",
+    "companyAddress": "303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208"
   },
   "adminCreds": {
     "id": "admin",

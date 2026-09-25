@@ -209,23 +209,23 @@ export default function SalarySlipModal({
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-blue-600 text-white flex items-center justify-center font-black text-sm shrink-0">
-                    {config.companyName ? config.companyName.charAt(0) : 'A'}
+                  <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                    SK
                   </div>
-                  <h1 className="text-lg font-black tracking-tight text-slate-950 uppercase leading-none">
-                    {config.companyName || 'AttendFlow Enterprise Solutions Ltd.'}
+                  <h1 className="text-xl font-black tracking-tight text-slate-950 uppercase leading-tight">
+                    {config.companyName || 'SK ENTERPRISES'}
                   </h1>
                 </div>
-                <p className="text-[9.5px] text-slate-500 font-medium">
-                  CIN: U72200MH2021PTC368412 • GSTIN: 27AABCT3920K1ZM • PF Reg: MH/BAN/0048291
+                <p className="text-[10px] text-slate-700 font-medium max-w-xl">
+                  {config.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
                 </p>
-                <p className="text-[9.5px] text-slate-500">
-                  Global Technology Park, Financial District, Cyber City, Mumbai - 400051
+                <p className="text-[9px] text-slate-500 font-medium">
+                  CIN: U72200MH2021PTC368412 • GSTIN: 27AABCT3920K1ZM • PF Reg: MH/BAN/0048291
                 </p>
               </div>
 
               <div className="text-right space-y-0.5 shrink-0">
-                <div className="inline-block px-2 py-0.5 rounded bg-slate-950 text-white text-[9px] font-black tracking-wider uppercase">
+                <div className="inline-block px-2.5 py-0.5 rounded bg-slate-950 text-white text-[9.5px] font-black tracking-wider uppercase">
                   SALARY PAYSLIP
                 </div>
                 <div className="text-[11px] font-bold text-slate-900">
@@ -298,7 +298,7 @@ export default function SalarySlipModal({
               <span>Attendance &amp; Shift Records for {monthYear}</span>
               <span className="text-slate-500 font-normal">Base Cycle: 22 Working Days</span>
             </div>
-            <div className="grid grid-cols-6 divide-x divide-slate-300 text-center bg-white py-1">
+            <div className="grid grid-cols-7 divide-x divide-slate-300 text-center bg-white py-1">
               <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Calendar Days</div>
                 <div className="text-xs font-black text-slate-900">30</div>
@@ -306,6 +306,10 @@ export default function SalarySlipModal({
               <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Present / WFH</div>
                 <div className="text-xs font-black text-emerald-600">{stats.inOffice + stats.wfh}</div>
+              </div>
+              <div className="px-1">
+                <div className="text-[8px] text-slate-500 font-medium">Week Off (WO)</div>
+                <div className="text-xs font-black text-sky-600">{stats.weekOff || 0}</div>
               </div>
               <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Approved Leaves</div>
@@ -447,7 +451,7 @@ export default function SalarySlipModal({
           <div className="p-2 px-3 rounded-lg bg-slate-50 border border-slate-200 text-[8.5px] text-slate-500 leading-snug mb-3">
             <p className="font-semibold text-slate-700 mb-0.5">Statutory &amp; Payroll Compliance Declaration:</p>
             <p>
-              1. This statement is an official computer-generated payslip issued under the Corporate HR &amp; Payroll regulations of {config.companyName || 'AttendFlow Enterprise Solutions Ltd.'}. No physical signature is required.
+              1. This statement is an official computer-generated payslip issued under the Corporate HR &amp; Payroll regulations of {config.companyName || 'SK ENTERPRISES'}. No physical signature is required.
             </p>
             <p>
               {isPfEsic 

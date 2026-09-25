@@ -272,9 +272,22 @@ export default function SettingsView({
           </label>
           <input
             type="text"
-            value={config.companyName}
+            value={config.companyName || ''}
             onChange={(e) => setConfig({ ...config, companyName: e.target.value })}
             className="w-full p-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+            Official Registered Address (Printed on Letterhead &amp; Salary Slips)
+          </label>
+          <textarea
+            rows={2}
+            value={config.companyAddress || ''}
+            onChange={(e) => setConfig({ ...config, companyAddress: e.target.value })}
+            placeholder="e.g. 303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208"
+            className="w-full p-2.5 text-sm rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium"
           />
         </div>
       </div>

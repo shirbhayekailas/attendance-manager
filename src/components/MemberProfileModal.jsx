@@ -93,6 +93,7 @@ export default function MemberProfileModal({
     else if (status === 'late') { mOffice++; mLate++; }
     else if (status === 'leave') mLeave++;
     else if (status === 'absent') mAbsent++;
+    else if (status === 'week_off' || status === 'wo') mWeekOff++;
 
     monthlyDayList.push({
       dayNum: d,
@@ -135,6 +136,8 @@ export default function MemberProfileModal({
       case 'half_day': return 'bg-amber-500 hover:bg-amber-400';
       case 'leave': return 'bg-purple-500 hover:bg-purple-400';
       case 'absent': return 'bg-rose-500 hover:bg-rose-400';
+      case 'week_off':
+      case 'wo': return 'bg-sky-500 hover:bg-sky-400';
       case 'weekend': return 'bg-slate-200/50 dark:bg-slate-800/40 opacity-40';
       default: return 'bg-slate-100 dark:bg-slate-800';
     }
@@ -144,14 +147,22 @@ export default function MemberProfileModal({
     <div className="print-modal-overlay fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
       <div className="print-modal-body bg-white dark:bg-slate-900 w-full max-w-4xl rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col">
         
-        {/* Official Print Header */}
+        {/* Official Print Header - SK ENTERPRISES LETTERHEAD */}
         <div className="print-only hidden p-6 border-b-2 border-slate-900 mb-2 text-black bg-white">
           <div className="flex justify-between items-start">
             <div>
-              <h1 className="text-xl font-black uppercase">{config?.companyName || 'AttendFlow Solutions Ltd.'}</h1>
-              <p className="text-xs text-slate-600 font-medium">Employee Confidential Dossier & Attendance Audit Record</p>
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0">
+                  SK
+                </div>
+                <h1 className="text-xl font-black uppercase text-slate-950">{config?.companyName || 'SK ENTERPRISES'}</h1>
+              </div>
+              <p className="text-[10px] text-slate-700 font-medium max-w-xl">
+                {config?.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
+              </p>
+              <p className="text-xs text-slate-900 font-bold mt-1">Employee Confidential Dossier &amp; Attendance Audit Record</p>
             </div>
-            <div className="text-right text-xs">
+            <div className="text-right text-xs space-y-0.5">
               <p className="font-bold text-slate-900">Generated on: {new Date().toLocaleDateString()}</p>
               <p className="text-slate-600">Staff Code: {employee.id}</p>
             </div>
