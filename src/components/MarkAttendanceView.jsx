@@ -1,0 +1,703 @@
+import React, { useState } from 'react';
+import { 
+  Calendar as CalendarIcon, 
+  ChevronLeft, 
+  ChevronRight, 
+  Check, 
+  X, 
+  Clock, 
+  FileText, 
+  Search, 
+  Sparkles, 
+  RotateCcw, 
+  Building, 
+  Home, 
+  CheckCheck, 
+  CheckSquare, 
+  Square, 
+  Layers, 
+  ArrowUpDown,
+  CalendarDays,
+  Printer
+} from 'lucide-react';
+import confetti from 'canvas-confetti';
+import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
+import { sounds } from '../utils/sound';
+
+export default function MarkAttendanceView({ 
+  employees, 
+  attendance, 
+  setAttendance, 
+  config, 
+  onSaveToast, 
+  onSelectEmployee,
+  onNavigate
+}) {
+  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDept, setSelectedDept] = useState('All');
+  const [selectedShift, setSelectedShift] = useState('All');
+  const [selectedIds, setSelectedIds] = useState([]); // Array of emp IDs for bulk actions
+  const [activeNoteModal, setActiveNoteModal] = useState(null);
+
+  const departments = ['All', ...new Set([
+    ...(config?.departments || []),
+    ...employees.map(e => e.department).filter(Boolean)
+  ])];
+  const shifts = ['All', 'General', 'Morning', 'Night', 'Flexible'];
+  const dayRecords = attendance[selectedDate] || {};
+
+  // Filter employees
+  const filteredEmployees = employees.filter((emp) => {
+    const matchesSearch = emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          emp.role.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
+    const matchesShift = selectedShift === 'All' || (emp.shiftType || 'General') === selectedShift;
+    return matchesSearch && matchesDept && matchesShift;
+  });
+
+  // Toggle selection
+  const handleToggleSelect = (id) => {
+    if (selectedIds.includes(id)) {
+      setSelectedIds(selectedIds.filter(item => item !== id));
+    } else {
+      setSelectedIds([...selectedIds, id]);
+    }
+  };
+
+  const handleSelectAll = () => {
+    if (selectedIds.length === filteredEmployees.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredEmployees.map(e => e.id));
+    }
+  };
+
+  // Bulk Apply to selected
+  const handleBulkStatusSelected = (status) => {
+    const targetIds = selectedIds.length > 0 ? selectedIds : filteredEmployees.map(e => e.id);
+    const updatedDay = { ...dayRecords };
+
+    targetIds.forEach((id) => {
+      let clockIn = "09:25 AM";
+      let clockOut = "06:30 PM";
+      let workingHours = "9h 05m";
+      let note = "";
+
+      if (status === 'wfh') {
+        note = "Approved Work From Home";
+      } else if (status === 'leave') {
+        clockIn = "--";
+        clockOut = "--";
+        workingHours = "0h 00m";
+        note = "Approved Casual/Sick Leave";
+      } else if (status === 'absent') {
+        clockIn = "--";
+        clockOut = "--";
+        workingHours = "0h 00m";
+        note = "Unapproved Absence (LWP)";
+      }
+
+      updatedDay[id] = {
+        ...(updatedDay[id] || {}),
+        status,
+        clockIn,
+        clockOut,
+        workingHours,
+        note,
+      };
+    });
+
+    setAttendance({ ...attendance, [selectedDate]: updatedDay });
+    sounds.playSuccess();
+    onSaveToast(`Updated ${targetIds.length} staff members to ${status.toUpperCase()}!`);
+    setSelectedIds([]);
+  };
+
+  // Single employee status update
+  const handleSetStatus = (empId, status) => {
+    sounds.playSuccess();
+    const currentRec = dayRecords[empId] || {};
+    let clockIn = currentRec.clockIn || "09:25 AM";
+    let clockOut = currentRec.clockOut || "06:30 PM";
+    let workingHours = "9h 05m";
+    let note = currentRec.note || "";
+
+    if (status === 'leave') {
+      clockIn = "--";
+      clockOut = "--";
+      workingHours = "0h 00m";
+      note = note || "Approved Casual/Sick Leave";
+    } else if (status === 'absent') {
+      clockIn = "--";
+      clockOut = "--";
+      workingHours = "0h 00m";
+      note = note || "Unapproved Absence (LWP)";
+    } else if (status === 'half_day') {
+      clockIn = "09:30 AM";
+      clockOut = "01:45 PM";
+      workingHours = "4h 15m";
+    } else if (status === 'wfh') {
+      note = note || "Work From Home";
+    }
+
+    const updated = {
+      ...attendance,
+      [selectedDate]: {
+        ...dayRecords,
+        [empId]: {
+          ...currentRec,
+          status,
+          clockIn,
+          clockOut,
+          workingHours,
+          note,
+        }
+      }
+    };
+
+    setAttendance(updated);
+  };
+
+  const handleSaveSheet = () => {
+    sounds.playSuccess();
+    try {
+      confetti({ particleCount: 70, spread: 60, origin: { y: 0.6 } });
+    } catch (e) {}
+    onSaveToast(`Timesheet attendance confirmed for ${selectedDate}!`);
+  };
+
+  // Date Navigation
+  const handlePrevDay = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() - 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + 1);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleToday = () => {
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+  };
+
+  // Counts
+  let inOffice = 0;
+  let wfh = 0;
+  let halfDay = 0;
+  let onLeave = 0;
+  let absent = 0;
+  let markedCount = 0;
+
+  filteredEmployees.forEach((emp) => {
+    const rec = dayRecords[emp.id];
+    if (rec && rec.status) {
+      markedCount++;
+      if (rec.status === 'present' || rec.status === 'late') inOffice++;
+      else if (rec.status === 'wfh') wfh++;
+      else if (rec.status === 'half_day') halfDay++;
+      else if (rec.status === 'leave') onLeave++;
+      else if (rec.status === 'absent') absent++;
+    }
+  });
+
+  const dayPercentage = markedCount > 0
+    ? Number(((inOffice + wfh + (halfDay * 0.5)) / markedCount * 100).toFixed(1))
+    : 0;
+
+  return (
+    <div className="space-y-6">
+      
+      {/* Portrait print setup for Daily Attendance Sheet */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait !important;
+            margin: 8mm 10mm !important;
+          }
+        }
+      `}</style>
+
+      {/* Top Header & Date Navigation Bar */}
+      <div className="no-print bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+        
+        {/* Date Selector */}
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <button
+            onClick={handlePrevDay}
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+            title="Previous Day"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/80 px-3.5 py-2 rounded-2xl border border-slate-200/80 dark:border-slate-700">
+            <CalendarIcon className="w-4 h-4 text-blue-500" />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="bg-transparent text-sm font-bold text-slate-900 dark:text-white outline-none cursor-pointer font-mono"
+            />
+          </div>
+
+          <button
+            onClick={handleNextDay}
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
+            title="Next Day"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <button
+            onClick={handleToday}
+            className="px-3.5 py-2 text-xs font-bold rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/60 transition-colors"
+          >
+            Today
+          </button>
+
+          {/* Daily vs Monthly Switcher */}
+          {onNavigate && (
+            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold ml-2">
+              <button
+                type="button"
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-2xs"
+              >
+                Daily
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playSuccess();
+                  onNavigate('monthly');
+                }}
+                className="px-3 py-1.5 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all flex items-center gap-1.5"
+                title="Switch to 30-Day Monthly Attendance Grid"
+              >
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span>Monthly Muster</span>
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Bulk Action Buttons & Print */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button
+            onClick={() => {
+              sounds.playSuccess();
+              window.print();
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 shadow-sm transition-all"
+            title="Print Daily Sheet"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print Daily Sheet</span>
+          </button>
+
+          <button
+            onClick={() => handleBulkStatusSelected('present')}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/60 transition-all active:scale-95"
+          >
+            <Building className="w-3.5 h-3.5" />
+            <span>Mark {selectedIds.length > 0 ? `(${selectedIds.length})` : 'All'} Office</span>
+          </button>
+
+          <button
+            onClick={() => handleBulkStatusSelected('wfh')}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/60 transition-all active:scale-95"
+          >
+            <Home className="w-3.5 h-3.5" />
+            <span>Mark {selectedIds.length > 0 ? `(${selectedIds.length})` : 'All'} WFH</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (window.confirm(`Clear attendance for ${selectedDate}?`)) {
+                const updated = { ...attendance };
+                delete updated[selectedDate];
+                setAttendance(updated);
+                onSaveToast("Cleared date records");
+              }
+            }}
+            className="p-2 rounded-xl text-slate-400 hover:text-rose-600 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+            title="Reset this day"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="no-print grid grid-cols-1 sm:grid-cols-4 gap-3">
+        {/* Search */}
+        <div className="relative sm:col-span-2">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search employee by name, ID, or title..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 text-sm bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        {/* Department Filter */}
+        <div>
+          <select
+            value={selectedDept}
+            onChange={(e) => setSelectedDept(e.target.value)}
+            className="w-full px-3 py-2 text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {departments.map((d) => (
+              <option key={d} value={d}>Department: {d}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Shift Filter */}
+        <div>
+          <select
+            value={selectedShift}
+            onChange={(e) => setSelectedShift(e.target.value)}
+            className="w-full px-3 py-2 text-xs font-bold bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            {shifts.map((s) => (
+              <option key={s} value={s}>Shift: {s}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Official Print Header */}
+      <div className="print-only hidden p-5 mb-4 border-b-2 border-slate-900 bg-white text-slate-900">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-xl font-black uppercase tracking-tight">
+              {config?.companyName || 'AttendFlow Enterprise Solutions Ltd.'}
+            </h1>
+            <p className="text-xs font-bold text-slate-800">
+              DAILY EMPLOYEE ATTENDANCE ROSTER &amp; SHIFT LOG
+            </p>
+            <p className="text-[10px] text-slate-500">
+              Roster Date: <span className="font-bold text-slate-900">{selectedDate}</span> • Cycle: Fiscal 2026-27
+            </p>
+          </div>
+          <div className="text-right text-xs space-y-0.5">
+            <p className="font-bold text-slate-900">Staff Count: {filteredEmployees.length}</p>
+            <p className="text-[11px] text-slate-600">Department: {selectedDept}</p>
+            <p className="text-[10px] text-slate-500">Generated: {new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Corporate Attendance Table with Multi-Select Checkboxes */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden printable-document">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-200/80 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-800/40 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                <th className="no-print py-3.5 px-4 w-10 text-center">
+                  <button onClick={handleSelectAll} className="text-slate-400 hover:text-blue-600">
+                    {selectedIds.length === filteredEmployees.length && filteredEmployees.length > 0 ? (
+                      <CheckSquare className="w-4 h-4 text-blue-600" />
+                    ) : (
+                      <Square className="w-4 h-4" />
+                    )}
+                  </button>
+                </th>
+                <th className="py-3.5 px-4">Employee</th>
+                <th className="py-3.5 px-4 hidden md:table-cell">Department & Shift</th>
+                <th className="py-3.5 px-4 text-center">Punch Timings & Overtime</th>
+                <th className="py-3.5 px-4 text-center">Status for {selectedDate}</th>
+                <th className="py-3.5 px-4 text-right">Remarks</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-sm">
+              {filteredEmployees.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400 text-xs">
+                    No employees registered yet. Go to <strong className="text-blue-500">Employee Directory</strong> to onboard staff.
+                  </td>
+                </tr>
+              ) : (
+                filteredEmployees.map((emp) => {
+                const rec = dayRecords[emp.id];
+                const status = rec?.status || null;
+                const isSelected = selectedIds.includes(emp.id);
+
+                return (
+                  <tr 
+                    key={emp.id}
+                    className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors ${
+                      isSelected ? 'bg-blue-50/50 dark:bg-blue-950/20' : ''
+                    }`}
+                  >
+                    {/* Checkbox */}
+                    <td className="no-print py-3.5 px-4 text-center">
+                      <button onClick={() => handleToggleSelect(emp.id)} className="text-slate-400 hover:text-blue-600">
+                        {isSelected ? (
+                          <CheckSquare className="w-4 h-4 text-blue-600" />
+                        ) : (
+                          <Square className="w-4 h-4" />
+                        )}
+                      </button>
+                    </td>
+
+                    {/* Employee */}
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={emp.avatar} 
+                          alt={emp.name} 
+                          className="w-10 h-10 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 cursor-pointer"
+                          onClick={() => onSelectEmployee(emp)}
+                        />
+                        <div>
+                          <div 
+                            className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer flex items-center gap-1.5"
+                            onClick={() => onSelectEmployee(emp)}
+                          >
+                            <span>{emp.name}</span>
+                          </div>
+                          <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-slate-700 dark:text-slate-300">{emp.id}</span>
+                            <span>•</span>
+                            <span>{emp.role}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Department & Shift */}
+                    <td className="py-3.5 px-4 hidden md:table-cell text-xs">
+                      <div className="font-bold text-slate-800 dark:text-slate-200">{emp.department}</div>
+                      <div className="text-[11px] text-slate-400 font-medium">{emp.shift}</div>
+                    </td>
+
+                    {/* Punch Timings & Overtime */}
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                        {rec?.clockIn ? `${rec.clockIn} - ${rec.clockOut}` : '--'}
+                      </div>
+                      <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 mt-0.5">
+                        {(() => {
+                          const hasPunches = rec?.clockIn && rec?.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--';
+                          const dur = hasPunches ? calculateWorkDuration(rec.clockIn, rec.clockOut) : null;
+                          const displayHours = dur ? dur.workingHours : (rec?.workingHours || '0h');
+                          const ot = dur ? dur.overtimeHours : (rec?.overtimeHours || 0);
+                          return (
+                            <>
+                              <span>{displayHours}</span>
+                              {ot > 0 && (
+                                <span className="px-1.5 py-0.2 rounded font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                  +{ot}h OT
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </td>
+
+                    {/* Quick Status Buttons */}
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="no-print flex items-center justify-center gap-1 sm:gap-1.5">
+                        {/* Office */}
+                        <button
+                          onClick={() => handleSetStatus(emp.id, 'present')}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                            status === 'present'
+                              ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/30 scale-105'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-emerald-600'
+                          }`}
+                          title="Office Present"
+                        >
+                          <Building className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Office</span>
+                        </button>
+
+                        {/* WFH */}
+                        <button
+                          onClick={() => handleSetStatus(emp.id, 'wfh')}
+                          className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                            status === 'wfh'
+                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-indigo-600'
+                          }`}
+                          title="Work From Home"
+                        >
+                          <Home className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">WFH</span>
+                        </button>
+
+                        {/* Half Day */}
+                        <button
+                          onClick={() => handleSetStatus(emp.id, 'half_day')}
+                          className={`px-2 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                            status === 'half_day'
+                              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30 scale-105'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-amber-600'
+                          }`}
+                          title="Half Day"
+                        >
+                          <span>Half</span>
+                        </button>
+
+                        {/* Leave */}
+                        <button
+                          onClick={() => handleSetStatus(emp.id, 'leave')}
+                          className={`px-2 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                            status === 'leave'
+                              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30 scale-105'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-purple-600'
+                          }`}
+                          title="Approved Leave"
+                        >
+                          <span>Leave</span>
+                        </button>
+
+                        {/* LWP */}
+                        <button
+                          onClick={() => handleSetStatus(emp.id, 'absent')}
+                          className={`px-2 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 ${
+                            status === 'absent'
+                              ? 'bg-rose-600 text-white shadow-md shadow-rose-600/30 scale-105'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:text-rose-600'
+                          }`}
+                          title="Loss of Pay"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">LWP</span>
+                        </button>
+                      </div>
+
+                      {/* Clean Print Badge */}
+                      <div className="print-only hidden font-bold text-xs uppercase text-center">
+                        {status ? (
+                          <span className={`px-2.5 py-1 rounded font-bold text-xs ${
+                            status === 'present' ? 'bg-emerald-100 text-emerald-900 border border-emerald-300' :
+                            status === 'wfh' ? 'bg-indigo-100 text-indigo-900 border border-indigo-300' :
+                            status === 'late' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
+                            status === 'half_day' ? 'bg-yellow-100 text-yellow-900 border border-yellow-300' :
+                            status === 'leave' ? 'bg-purple-100 text-purple-900 border border-purple-300' :
+                            'bg-rose-100 text-rose-900 border border-rose-300'
+                          }`}>
+                            {status.replace('_', ' ').toUpperCase()}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">NOT MARKED</span>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Remarks */}
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="no-print">
+                        <button
+                          onClick={() => setActiveNoteModal({
+                            empId: emp.id,
+                            name: emp.name,
+                            note: rec?.note || '',
+                            clockIn: rec?.clockIn || '09:30 AM',
+                            clockOut: rec?.clockOut || '06:30 PM',
+                          })}
+                          className={`p-2 rounded-xl transition-colors ${
+                            rec?.note 
+                              ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold' 
+                              : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                          title={rec?.note ? `Note: ${rec.note}` : 'Edit timings / note'}
+                        >
+                          <FileText className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="print-only hidden text-xs text-slate-700 italic">
+                        {rec?.note || '--'}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Official Signatures for Printed Daily Sheet */}
+      <div className="print-only hidden pt-12 grid grid-cols-3 gap-6 text-center text-xs text-slate-900 bg-white">
+        <div className="border-t-2 border-slate-900 pt-2 font-bold">
+          <p>Duty Officer / Gate Security</p>
+          <p className="text-[10px] text-slate-500 font-normal">Physical Attendance Log Verified</p>
+        </div>
+        <div className="border-t-2 border-slate-900 pt-2 font-bold">
+          <p>Shift Supervisor / Line Manager</p>
+          <p className="text-[10px] text-slate-500 font-normal">Shift Hours &amp; Overtime Checked</p>
+        </div>
+        <div className="border-t-2 border-slate-900 pt-2 font-bold">
+          <p>HR Attendance Officer</p>
+          <p className="text-[10px] text-slate-500 font-normal">HRMS System Reconciled</p>
+        </div>
+      </div>
+
+      {/* Sticky Bottom Summary Toolbar */}
+      <div className="no-print sticky bottom-4 z-30 bg-slate-900/95 dark:bg-slate-800/95 text-white backdrop-blur-xl px-6 py-4 rounded-3xl shadow-2xl border border-slate-700/60 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Total Filtered:</span>
+            <span className="font-bold text-white text-sm">{filteredEmployees.length}</span>
+          </div>
+          <div className="h-4 w-px bg-slate-700 hidden sm:block"></div>
+
+          <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+            <span>Office: {inOffice}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-indigo-300 font-bold">
+            <span className="w-2.5 h-2.5 rounded-full bg-indigo-400"></span>
+            <span>WFH: {wfh}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-amber-400 font-bold">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500"></span>
+            <span>Half Day: {halfDay}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-purple-300 font-bold">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-400"></span>
+            <span>Leave: {onLeave}</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 text-rose-400 font-bold">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+            <span>LWP: {absent}</span>
+          </div>
+
+          <div className="h-4 w-px bg-slate-700 hidden sm:block"></div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400">Attendance:</span>
+            <span className="font-black text-sm text-blue-400">
+              {dayPercentage}%
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={handleSaveSheet}
+          className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-black text-xs sm:text-sm rounded-2xl shadow-lg shadow-blue-600/30 flex items-center justify-center gap-2 transition-all"
+        >
+          <Sparkles className="w-4 h-4 text-amber-300" />
+          <span>Confirm & Lock Timesheet</span>
+        </button>
+      </div>
+
+    </div>
+  );
+}
