@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import DashboardView from './components/DashboardView';
@@ -37,6 +37,12 @@ import {
   wipeAllStoredData,
   defaultCompanyConfig 
 } from './utils/storage';
+import { 
+  fetchServerSync, 
+  pushServerSync, 
+  resetDemoOnServer, 
+  wipeCleanOnServer 
+} from './utils/apiClient';
 import { getCompanyDailyOverview } from './utils/attendanceCalculations';
 import { sounds } from './utils/sound';
 
@@ -56,6 +62,9 @@ export default function App() {
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [syncStatus, setSyncStatus] = useState('syncing'); // 'synced' | 'syncing' | 'offline'
+
+  const isInitialSyncDone = useRef(false);
 
   // Authentication & RBAC User State
   const [currentUser, setCurrentUser] = useState(() => {
@@ -85,55 +94,127 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Sync state to LocalStorage
+  // Live Server Database Synchronization (Multi-Device Real-time)
+  useEffect(() => {
+    let isMounted = true;
+
+    async function syncWithServer(isBackground = false) {
+      if (!isBackground) setSyncStatus('syncing');
+      const res = await fetchServerSync();
+      if (!isMounted) return;
+
+      if (res.success && res.data) {
+        const { data } = res;
+        if (data.employees) setEmployees(data.employees);
+        if (data.attendance) setAttendance(data.attendance);
+        if (data.leaves) setLeaves(data.leaves);
+        if (data.advances) setAdvances(data.advances);
+        if (data.config) setConfig(prev => ({ ...prev, ...data.config }));
+        if (data.adminCreds) setAdminCreds(data.adminCreds);
+        setSyncStatus('synced');
+        isInitialSyncDone.current = true;
+      } else {
+        setSyncStatus('offline');
+        isInitialSyncDone.current = true;
+      }
+    }
+
+    syncWithServer();
+
+    // Auto-fetch updates from server every 8 seconds (e.g. mobile punches / admin updates)
+    const interval = setInterval(() => {
+      syncWithServer(true);
+    }, 8000);
+
+    // Immediate sync when user switches back to tab or unlocks phone
+    const handleFocus = () => {
+      syncWithServer();
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
+  // Sync state to LocalStorage & Server Cloud Database
   useEffect(() => {
     saveEmployees(employees);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ employees }).then(() => setSyncStatus('synced'));
+    }
   }, [employees]);
 
   useEffect(() => {
     saveAttendance(attendance);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ attendance }).then(() => setSyncStatus('synced'));
+    }
   }, [attendance]);
 
   useEffect(() => {
     saveLeaveRequests(leaves);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ leaves }).then(() => setSyncStatus('synced'));
+    }
   }, [leaves]);
 
   useEffect(() => {
     saveConfig(config);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ config }).then(() => setSyncStatus('synced'));
+    }
   }, [config]);
 
   useEffect(() => {
     saveAdminCreds(adminCreds);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ adminCreds }).then(() => setSyncStatus('synced'));
+    }
   }, [adminCreds]);
 
   useEffect(() => {
     saveAdvances(advances);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ advances }).then(() => setSyncStatus('synced'));
+    }
   }, [advances]);
 
   const triggerToast = (msg) => {
     setToastMessage(msg);
   };
 
-  // Wipe All Data cleanly
-  const handleWipeCleanData = () => {
+  // Wipe All Data cleanly on Local & Cloud Server
+  const handleWipeCleanData = async () => {
     wipeAllStoredData();
     setEmployees([]);
     setAttendance({});
     setLeaves([]);
+    setAdvances([]);
     setAdminCreds(defaultAdminCreds);
+    await wipeCleanOnServer();
     sounds.playSuccess();
-    triggerToast("All data wiped! Admin password reset to default 1234.");
+    triggerToast("All data wiped across all devices! Admin password reset to default 1234.");
   };
 
-  // Optional Reload Demo Data (in Settings only)
-  const handleResetDemoData = () => {
-    if (window.confirm("Load sample corporate dataset for testing?")) {
+  // Optional Reload Demo Data on Local & Cloud Server
+  const handleResetDemoData = async () => {
+    if (window.confirm("Load sample corporate dataset for testing across all devices?")) {
       const freshHistory = generateCorporateHistory(DEMO_SAMPLE_EMPLOYEES);
       setEmployees(DEMO_SAMPLE_EMPLOYEES);
       setAttendance(freshHistory);
       setLeaves(INITIAL_LEAVE_REQUESTS);
+      await resetDemoOnServer();
       sounds.playSuccess();
-      triggerToast("Sample corporate records loaded!");
+      triggerToast("Sample corporate records loaded on cloud server!");
     }
   };
 
@@ -182,6 +263,7 @@ export default function App() {
           setTheme={setTheme}
           currentUser={currentUser}
           notifications={INITIAL_NOTIFICATIONS}
+          syncStatus={syncStatus}
           onLogout={() => {
             setCurrentUser(null);
             triggerToast("Logged out of Employee Portal");
@@ -228,6 +310,7 @@ export default function App() {
         theme={theme}
         setTheme={setTheme}
         currentUser={currentUser}
+        syncStatus={syncStatus}
         onLogout={() => {
           setCurrentUser(null);
           triggerToast("Logged out successfully.");

@@ -1,0 +1,648 @@
+{
+  "employees": [
+    {
+      "id": "EMP-101",
+      "name": "Aarav Sharma",
+      "avatar": "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80",
+      "role": "Staff Software Engineer",
+      "department": "Engineering",
+      "workType": "Hybrid",
+      "shift": "General (09:30 AM - 06:30 PM)",
+      "shiftType": "General",
+      "email": "aarav.sharma@company.com",
+      "phone": "+91 98765 43210",
+      "joinDate": "2023-04-15",
+      "reportsTo": "Divya Nair (Architect)",
+      "salaryMonthly": 145000,
+      "salaryBase": "₹1,45,000",
+      "statutoryType": "pf_esic",
+      "uanNo": "1014892019101",
+      "accessLevel": "employee",
+      "loginId": "EMP-101",
+      "password": "1234",
+      "leaveBalance": {
+        "cl": 8,
+        "sl": 5,
+        "pl": 12
+      },
+      "status": "Active"
+    },
+    {
+      "id": "EMP-102",
+      "name": "Priya Patel",
+      "avatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80",
+      "role": "Lead Product Designer",
+      "department": "Design",
+      "workType": "Hybrid",
+      "shift": "Flexible (10:00 AM - 07:00 PM)",
+      "shiftType": "Flexible",
+      "email": "priya.patel@company.com",
+      "phone": "+91 98765 43211",
+      "joinDate": "2023-06-01",
+      "reportsTo": "Sneha Reddy (VP Product)",
+      "salaryMonthly": 135000,
+      "salaryBase": "₹1,35,000",
+      "statutoryType": "pf_esic",
+      "uanNo": "1014892019102",
+      "accessLevel": "manager",
+      "loginId": "EMP-102",
+      "password": "1234",
+      "leaveBalance": {
+        "cl": 6,
+        "sl": 4,
+        "pl": 10
+      },
+      "status": "Active"
+    },
+    {
+      "id": "EMP-103",
+      "name": "Rohan Verma",
+      "avatar": "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80",
+      "role": "Senior DevOps & SRE",
+      "department": "Engineering",
+      "workType": "Remote",
+      "shift": "US Shift (06:00 PM - 03:00 AM)",
+      "shiftType": "Night",
+      "email": "rohan.verma@company.com",
+      "phone": "+91 98765 43212",
+      "joinDate": "2023-09-10",
+      "reportsTo": "Divya Nair (Architect)",
+      "salaryMonthly": 140000,
+      "salaryBase": "₹1,40,000",
+      "statutoryType": "non_pf_esic",
+      "accessLevel": "employee",
+      "loginId": "EMP-103",
+      "password": "1234",
+      "leaveBalance": {
+        "cl": 4,
+        "sl": 2,
+        "pl": 7
+      },
+      "status": "Active"
+    },
+    {
+      "id": "EMP-104",
+      "name": "Ananya Iyer",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+      "role": "Head of People & Culture",
+      "department": "Human Resources",
+      "workType": "On-Site",
+      "shift": "General (09:30 AM - 06:30 PM)",
+      "shiftType": "General",
+      "email": "ananya.iyer@company.com",
+      "phone": "+91 98765 43213",
+      "joinDate": "2022-11-01",
+      "reportsTo": "CEO Office",
+      "salaryMonthly": 120000,
+      "salaryBase": "₹1,20,000",
+      "statutoryType": "pf_esic",
+      "uanNo": "1014892019104",
+      "accessLevel": "admin",
+      "loginId": "EMP-104",
+      "password": "1234",
+      "leaveBalance": {
+        "cl": 9,
+        "sl": 6,
+        "pl": 14
+      },
+      "status": "Active"
+    },
+    {
+      "id": "EMP-105",
+      "name": "Vikram Malhotra",
+      "avatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80",
+      "role": "Director of Enterprise Sales",
+      "department": "Sales & Growth",
+      "workType": "Hybrid",
+      "shift": "General (09:30 AM - 06:30 PM)",
+      "shiftType": "General",
+      "email": "vikram.m@company.com",
+      "phone": "+91 98765 43214",
+      "joinDate": "2023-01-15",
+      "reportsTo": "CEO Office",
+      "salaryMonthly": 160000,
+      "salaryBase": "₹1,60,000",
+      "statutoryType": "non_pf_esic",
+      "accessLevel": "employee",
+      "loginId": "EMP-105",
+      "password": "1234",
+      "leaveBalance": {
+        "cl": 5,
+        "sl": 3,
+        "pl": 8
+      },
+      "status": "Active"
+    }
+  ],
+  "attendance": {
+    "2026-09-11": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-14": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-15": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-16": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-17": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-18": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-21": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-22": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-23": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-24": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    },
+    "2026-09-25": {
+      "EMP-101": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-102": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-103": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-104": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      },
+      "EMP-105": {
+        "status": "present",
+        "clockIn": "09:25 AM",
+        "clockOut": "06:35 PM",
+        "workingHours": "9h 10m",
+        "overtimeHours": 0.5,
+        "note": "Regular Shift"
+      }
+    }
+  },
+  "leaves": [
+    {
+      "id": "LV-1001",
+      "employeeId": "EMP-101",
+      "employeeName": "Aarav Sharma",
+      "department": "Engineering",
+      "leaveType": "Casual Leave (CL)",
+      "startDate": "2026-09-25",
+      "endDate": "2026-09-25",
+      "days": 1,
+      "reason": "Personal urgent work",
+      "status": "Pending",
+      "submittedAt": "2026-09-25T16:53:39.389Z"
+    }
+  ],
+  "advances": [
+    {
+      "id": "ADV-INIT-1",
+      "empId": "EMP-101",
+      "empName": "Aarav Sharma",
+      "amount": 5000,
+      "date": "2026-09-25",
+      "month": "2026-09",
+      "paymentMode": "UPI / Online",
+      "reason": "Festival Advance",
+      "status": "active",
+      "createdAt": "2026-09-25T16:53:39.389Z"
+    }
+  ],
+  "config": {
+    "companyName": "Acme Global Tech"
+  },
+  "adminCreds": {
+    "id": "admin",
+    "email": "admin@company.com",
+    "password": "1234"
+  },
+  "audit": [
+    {
+      "id": "AUD-1790355219389",
+      "action": "SERVER_DB_INITIALIZED",
+      "actor": "System",
+      "detail": "Server database started and verified for multi-device sync.",
+      "timestamp": "2026-09-25T16:53:39.389Z"
+    }
+  ],
+  "lastUpdated": "2026-09-25T17:01:30.002Z"
+}
