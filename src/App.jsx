@@ -366,6 +366,7 @@ export default function App() {
               config={config}
               onSelectEmployee={setSelectedEmployee}
               onSaveToast={triggerToast}
+              onNavigate={setCurrentTab}
             />
           )}
 
@@ -452,14 +453,16 @@ export default function App() {
 
       {/* Employee Dossier & Heatmap Modal */}
       {selectedEmployee && (
-        <MemberProfileModal
-          employee={selectedEmployee}
-          attendance={attendance}
-          advances={advances}
-          setAdvances={setAdvances}
-          config={config}
-          onClose={() => setSelectedEmployee(null)}
-        />
+        <ErrorBoundary>
+          <MemberProfileModal
+            employee={selectedEmployee}
+            attendance={attendance}
+            advances={advances}
+            setAdvances={setAdvances}
+            config={config}
+            onClose={() => setSelectedEmployee(null)}
+          />
+        </ErrorBoundary>
       )}
 
       {/* Floating Animated Toast */}

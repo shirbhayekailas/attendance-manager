@@ -56,9 +56,11 @@ export default function ReportsView({
       const rec = attendance[d]?.[emp.id];
       if (rec && rec.status) {
         rangeTotal++;
-        const ot = (rec.clockIn && rec.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--')
-          ? calculateWorkDuration(rec.clockIn, rec.clockOut).overtimeHours
-          : (rec.overtimeHours || 0);
+        const ot = (rec.overtimeHours !== undefined && rec.overtimeHours !== null && rec.overtimeHours !== '')
+          ? Number(rec.overtimeHours)
+          : ((rec.clockIn && rec.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--')
+            ? calculateWorkDuration(rec.clockIn, rec.clockOut).overtimeHours
+            : 0);
         rangeOvertime += ot;
 
         if (rec.status === 'present') rangeOffice++;

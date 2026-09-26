@@ -79,6 +79,7 @@ export default function MemberProfileModal({
   let mLate = 0;
   let mLeave = 0;
   let mAbsent = 0;
+  let mWeekOff = 0;
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dObj = new Date(selectedYear, selectedMonth, d);
@@ -95,6 +96,10 @@ export default function MemberProfileModal({
     else if (status === 'absent') mAbsent++;
     else if (status === 'week_off' || status === 'wo') mWeekOff++;
 
+    const otHours = (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
+      ? Number(rec.overtimeHours)
+      : 0;
+
     monthlyDayList.push({
       dayNum: d,
       dateStr,
@@ -106,6 +111,7 @@ export default function MemberProfileModal({
       workingHours: (rec?.clockIn && rec?.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--')
         ? calculateWorkDuration(rec.clockIn, rec.clockOut).workingHours
         : (rec?.workingHours || '--'),
+      overtimeHours: otHours,
       note: rec?.note || '',
     });
   }
@@ -193,17 +199,20 @@ export default function MemberProfileModal({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pr-16">
             <div className="flex items-center gap-4">
               <img 
-                src={employee.avatar} 
-                alt={employee.name} 
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shadow-md"
+                src={employee.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'} 
+                alt={employee.name || 'Employee'} 
+                className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shadow-md bg-slate-800"
+                onError={(e) => {
+                  e.target.src = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150';
+                }}
               />
               <div className="space-y-1">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-xl font-bold text-white tracking-tight">
-                    {employee.name}
+                    {employee.name || 'Unnamed Employee'}
                   </h2>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-200 border border-blue-400/30">
-                    {employee.id}
+                    {employee.id || 'N/A'}
                   </span>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                     employee.accessLevel === 'admin' ? 'bg-purple-500/30 text-purple-200 border border-purple-400/30' :
@@ -221,7 +230,7 @@ export default function MemberProfileModal({
                   </span>
                 </div>
                 <p className="text-xs text-blue-200 font-semibold">
-                  {employee.role} • <span className="text-white font-bold">{employee.department}</span>
+                  {employee.role || 'Staff'} • <span className="text-white font-bold">{employee.department || 'Operations'}</span>
                 </p>
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 pt-0.5">
                   {employee.email && (
@@ -274,7 +283,7 @@ export default function MemberProfileModal({
         <div className="p-6 overflow-y-auto space-y-6 flex-1">
           
           {/* Key Quick Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
               <span className="text-[10px] font-bold uppercase text-slate-400">Total Payable</span>
               <div className="mt-1 text-2xl font-black text-emerald-600 dark:text-emerald-400">
@@ -304,6 +313,20 @@ export default function MemberProfileModal({
                 {(employee.leaveBalance?.cl || 6) + (employee.leaveBalance?.sl || 4)}d
               </div>
               <span className="text-[10px] text-slate-400 block mt-0.5">CL: {employee.leaveBalance?.cl || 6} | SL: {employee.leaveBalance?.sl || 4}</span>
+            </div>
+
+            {/* Overtime Card */}
+            <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/50 flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-bold uppercase text-amber-800 dark:text-amber-400">Overtime Logged</span>
+                <div className="mt-1 text-2xl font-black font-mono text-amber-700 dark:text-amber-300">
+                  {stats.totalOvertimeHours} <span className="text-xs font-normal text-amber-600 dark:text-amber-400">hrs</span>
+                </div>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-[10.5px]">
+                <span className="font-bold text-slate-500 dark:text-slate-400">OT Pay:</span>
+                <span className="font-black text-amber-700 dark:text-amber-300 font-mono">₹{(stats.overtimePay || 0).toLocaleString('en-IN')}</span>
+              </div>
             </div>
 
             {/* Advance Received Card */}
@@ -356,6 +379,8 @@ export default function MemberProfileModal({
                   <span>•</span>
                   <span className="text-indigo-600">{mWfh} WFH</span>
                   <span>•</span>
+                  <span className="text-sky-600">{mWeekOff} Week Off</span>
+                  <span>•</span>
                   <span className="text-amber-500">{mLate} Late</span>
                   <span>•</span>
                   <span className="text-purple-600">{mLeave} Leave</span>
@@ -372,7 +397,7 @@ export default function MemberProfileModal({
                       <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{d.dateStr}</span>
                       <span className="text-slate-400">({d.weekday})</span>
                       {d.clockIn && d.clockIn !== '--' && (
-                        <span className="font-mono text-slate-500 text-[11px]">
+                         <span className="font-mono text-slate-500 text-[11px]">
                           {d.clockIn} - {d.clockOut}
                         </span>
                       )}
@@ -384,16 +409,22 @@ export default function MemberProfileModal({
                           {d.workingHours}
                         </span>
                       )}
+                      {d.overtimeHours > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800/60">
+                          +{d.overtimeHours}h OT
+                        </span>
+                      )}
                       <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] uppercase ${
                         d.status === 'present' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
                         d.status === 'wfh' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' :
+                        (d.status === 'week_off' || d.status === 'wo') ? 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300' :
                         d.status === 'late' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
                         d.status === 'leave' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' :
                         d.status === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
                         d.isWeekend ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
                         'text-slate-400'
                       }`}>
-                        {d.status === 'present' ? 'Office' : d.status === 'none' ? 'No Log' : d.status}
+                        {d.status === 'present' ? 'Office' : (d.status === 'week_off' || d.status === 'wo') ? 'Week Off' : d.status === 'none' ? 'No Log' : d.status}
                       </span>
                     </div>
                   </div>

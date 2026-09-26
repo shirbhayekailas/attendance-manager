@@ -410,11 +410,18 @@ export default function MembersView({
               <div>
                 {/* Card Header */}
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
+                  <div 
+                    onClick={() => onSelectEmployee(emp)}
+                    className="flex items-center gap-3 cursor-pointer group"
+                    title={`View ${emp.name}'s Profile Dossier`}
+                  >
                     <img 
-                      src={emp.avatar} 
-                      alt={emp.name} 
-                      className="w-12 h-12 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                      src={emp.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'} 
+                      alt={emp.name || 'Employee'} 
+                      className="w-12 h-12 rounded-2xl object-cover border border-slate-200 dark:border-slate-700 shrink-0 group-hover:scale-105 transition-transform"
+                      onError={(e) => {
+                        e.target.src = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150';
+                      }}
                     />
                     <div>
                       <h3 className="font-bold text-slate-900 dark:text-white text-base group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">

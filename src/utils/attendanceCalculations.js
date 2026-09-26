@@ -66,8 +66,9 @@ export function calculateWorkDuration(clockIn, clockOut) {
   };
 }
 
-export function calculateEmployeeStats(empId, attendanceData, baseSalary = 100000, totalCycleDays = 22) {
-  const dates = Object.keys(attendanceData).sort();
+export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 100000, totalCycleDays = 22) {
+  const safeAttendance = attendanceData || {};
+  const dates = Object.keys(safeAttendance).sort();
   let totalWorkingDays = 0;
   let inOffice = 0;
   let wfh = 0;
@@ -81,7 +82,7 @@ export function calculateEmployeeStats(empId, attendanceData, baseSalary = 10000
   const logs = [];
 
   dates.forEach((date) => {
-    const record = attendanceData[date]?.[empId];
+    const record = safeAttendance[date]?.[empId];
     if (record && record.status) {
       totalWorkingDays++;
       const status = record.status;
@@ -92,7 +93,9 @@ export function calculateEmployeeStats(empId, attendanceData, baseSalary = 10000
         : null;
 
       const workingHours = actualDuration ? actualDuration.workingHours : (record.workingHours || "--");
-      const ot = actualDuration ? actualDuration.overtimeHours : (record.overtimeHours || 0);
+      const ot = (record.overtimeHours !== undefined && record.overtimeHours !== null && record.overtimeHours !== '')
+        ? Number(record.overtimeHours)
+        : (actualDuration ? actualDuration.overtimeHours : 0);
       totalOvertimeHours += ot;
 
       if (status === "present") inOffice++;
@@ -169,9 +172,11 @@ export function calculateEmployeeStats(empId, attendanceData, baseSalary = 10000
   };
 }
 
-export function getCompanyDailyOverview(dateStr, employees, attendanceData) {
-  const dayRecords = attendanceData[dateStr] || {};
-  const totalEmployees = employees.length;
+export function getCompanyDailyOverview(dateStr, employees = [], attendanceData = {}) {
+  const safeAttendance = attendanceData || {};
+  const dayRecords = safeAttendance[dateStr] || {};
+  const safeEmployees = employees || [];
+  const totalEmployees = safeEmployees.length;
   let inOffice = 0;
   let wfh = 0;
   let late = 0;
@@ -181,7 +186,7 @@ export function getCompanyDailyOverview(dateStr, employees, attendanceData) {
   let weekOff = 0;
   let unmarked = 0;
 
-  employees.forEach((emp) => {
+  safeEmployees.forEach((emp) => {
     const rec = dayRecords[emp.id];
     if (!rec || !rec.status) {
       unmarked++;
@@ -221,10 +226,12 @@ export function getCompanyDailyOverview(dateStr, employees, attendanceData) {
   };
 }
 
-export function getCompanyRecentTrend(attendanceData, employees, limit = 7) {
-  const dates = Object.keys(attendanceData).sort().slice(-limit);
+export function getCompanyRecentTrend(attendanceData = {}, employees = [], limit = 7) {
+  const safeAttendance = attendanceData || {};
+  const safeEmployees = employees || [];
+  const dates = Object.keys(safeAttendance).sort().slice(-limit);
   return dates.map((date) => {
-    const overview = getCompanyDailyOverview(date, employees, attendanceData);
+    const overview = getCompanyDailyOverview(date, safeEmployees, safeAttendance);
     return {
       date,
       displayDate: new Date(date + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" }),

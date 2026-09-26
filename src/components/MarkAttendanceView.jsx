@@ -18,7 +18,9 @@ import {
   Layers, 
   ArrowUpDown,
   CalendarDays,
-  Printer
+  Printer,
+  Plus,
+  Minus
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
@@ -168,6 +170,73 @@ export default function MarkAttendanceView({
     };
 
     setAttendance(updated);
+  };
+
+  // Explicit Overtime Setter (Direct Input / Quick Presets)
+  const handleSetOvertime = (empId, otHours) => {
+    sounds.playSuccess();
+    const currentRec = dayRecords[empId] || {};
+    const numOt = Math.max(0, Number(otHours) || 0);
+
+    const updated = {
+      ...attendance,
+      [selectedDate]: {
+        ...dayRecords,
+        [empId]: {
+          ...(currentRec.status ? currentRec : {
+            status: 'present',
+            clockIn: '09:25 AM',
+            clockOut: '06:30 PM',
+            workingHours: '9h 05m',
+          }),
+          overtimeHours: numOt,
+        }
+      }
+    };
+
+    setAttendance(updated);
+    const empName = employees.find(e => e.id === empId)?.name || empId;
+    onSaveToast(`Set Overtime to ${numOt}h for ${empName}`);
+  };
+
+  const handleAdjustOvertime = (empId, delta) => {
+    const currentRec = dayRecords[empId] || {};
+    const currentOt = Number(currentRec.overtimeHours) || 0;
+    const newOt = Math.max(0, Number((currentOt + delta).toFixed(1)));
+    handleSetOvertime(empId, newOt);
+  };
+
+  const handleSaveTimingsModal = (e) => {
+    e?.preventDefault?.();
+    if (!activeNoteModal) return;
+    sounds.playSuccess();
+
+    const { empId, status, clockIn, clockOut, overtimeHours, note } = activeNoteModal;
+    const currentRec = dayRecords[empId] || {};
+
+    const hasPunches = clockIn && clockOut && clockIn !== '--' && clockOut !== '--';
+    const dur = hasPunches ? calculateWorkDuration(clockIn, clockOut) : null;
+    const workingHours = dur ? dur.workingHours : (currentRec.workingHours || '--');
+
+    const updated = {
+      ...attendance,
+      [selectedDate]: {
+        ...dayRecords,
+        [empId]: {
+          ...currentRec,
+          status: status || currentRec.status || 'present',
+          clockIn: clockIn || currentRec.clockIn || '09:25 AM',
+          clockOut: clockOut || currentRec.clockOut || '06:30 PM',
+          workingHours,
+          overtimeHours: Math.max(0, Number(overtimeHours) || 0),
+          note: note || '',
+        }
+      }
+    };
+
+    setAttendance(updated);
+    setActiveNoteModal(null);
+    onSaveToast(`Updated timings & ${overtimeHours || 0}h Overtime for ${activeNoteModal.name}!`);
   };
 
   const handleSaveSheet = () => {
@@ -510,20 +579,37 @@ export default function MarkAttendanceView({
 
                     {/* Punch Timings & Overtime */}
                     <td className="py-3.5 px-4 text-center">
-                      <div className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200">
+                      <div 
+                        onClick={() => setActiveNoteModal({
+                          empId: emp.id,
+                          name: emp.name,
+                          status: status || 'present',
+                          note: rec?.note || '',
+                          clockIn: rec?.clockIn || '09:25 AM',
+                          clockOut: rec?.clockOut || '06:30 PM',
+                          overtimeHours: (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
+                            ? Number(rec.overtimeHours)
+                            : 0,
+                        })}
+                        className="text-xs font-mono font-bold text-slate-800 dark:text-slate-200 cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        title="Click to edit Punch-In and Punch-Out timings"
+                      >
                         {rec?.clockIn ? `${rec.clockIn} - ${rec.clockOut}` : '--'}
                       </div>
-                      <div className="flex items-center justify-center gap-1 text-[10px] text-slate-400 mt-0.5">
+                      
+                      <div className="flex items-center justify-center gap-1.5 text-[10px] text-slate-400 mt-0.5">
                         {(() => {
                           const hasPunches = rec?.clockIn && rec?.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--';
                           const dur = hasPunches ? calculateWorkDuration(rec.clockIn, rec.clockOut) : null;
                           const displayHours = dur ? dur.workingHours : (rec?.workingHours || '0h');
-                          const ot = dur ? dur.overtimeHours : (rec?.overtimeHours || 0);
+                          const ot = (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
+                            ? Number(rec.overtimeHours)
+                            : (dur ? dur.overtimeHours : 0);
                           return (
                             <>
-                              <span>{displayHours}</span>
+                              <span className="font-medium">{displayHours}</span>
                               {ot > 0 && (
-                                <span className="px-1.5 py-0.2 rounded font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                                <span className="px-1.5 py-0.5 rounded-md font-bold bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800/60">
                                   +{ot}h OT
                                 </span>
                               )}
@@ -531,6 +617,106 @@ export default function MarkAttendanceView({
                           );
                         })()}
                       </div>
+
+                      {/* Interactive Overtime (OT) Controls */}
+                      {(() => {
+                        const hasPunches = rec?.clockIn && rec?.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--';
+                        const dur = hasPunches ? calculateWorkDuration(rec.clockIn, rec.clockOut) : null;
+                        const ot = (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
+                          ? Number(rec.overtimeHours)
+                          : (dur ? dur.overtimeHours : 0);
+
+                        return (
+                          <div className="no-print mt-2 flex flex-col items-center gap-1">
+                            <div className="inline-flex items-center rounded-xl bg-slate-100 dark:bg-slate-800 p-0.5 border border-slate-200/80 dark:border-slate-700 shadow-2xs">
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustOvertime(emp.id, -0.5)}
+                                className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-black text-xs transition-colors"
+                                title="Minus 30 mins OT (-0.5h)"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </button>
+                              
+                              <button
+                                type="button"
+                                onClick={() => setActiveNoteModal({
+                                  empId: emp.id,
+                                  name: emp.name,
+                                  status: status || 'present',
+                                  note: rec?.note || '',
+                                  clockIn: rec?.clockIn || '09:25 AM',
+                                  clockOut: rec?.clockOut || '06:30 PM',
+                                  overtimeHours: ot,
+                                })}
+                                className="px-2 py-0.5 text-center font-mono font-bold text-xs text-amber-700 dark:text-amber-400 hover:underline"
+                                title="Click to open modal & type exact OT hours"
+                              >
+                                {ot > 0 ? `${ot}h OT` : '0h OT'}
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => handleAdjustOvertime(emp.id, 0.5)}
+                                className="w-5 h-5 flex items-center justify-center rounded-lg hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 font-black text-xs transition-colors"
+                                title="Plus 30 mins OT (+0.5h)"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </button>
+                            </div>
+
+                            {/* Quick Presets: +1h, +2h, +3h */}
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleSetOvertime(emp.id, 1)}
+                                className={`px-1.5 py-0.5 text-[9.5px] font-bold rounded transition-all ${
+                                  ot === 1 
+                                    ? 'bg-amber-500 text-white shadow-xs' 
+                                    : 'bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-950/60 text-slate-600 dark:text-slate-300'
+                                }`}
+                                title="Set 1 Hour OT"
+                              >
+                                +1h
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSetOvertime(emp.id, 2)}
+                                className={`px-1.5 py-0.5 text-[9.5px] font-bold rounded transition-all ${
+                                  ot === 2 
+                                    ? 'bg-amber-500 text-white shadow-xs' 
+                                    : 'bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-950/60 text-slate-600 dark:text-slate-300'
+                                }`}
+                                title="Set 2 Hours OT"
+                              >
+                                +2h
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleSetOvertime(emp.id, 3)}
+                                className={`px-1.5 py-0.5 text-[9.5px] font-bold rounded transition-all ${
+                                  ot === 3 
+                                    ? 'bg-amber-500 text-white shadow-xs' 
+                                    : 'bg-slate-100 hover:bg-amber-100 dark:bg-slate-800 dark:hover:bg-amber-950/60 text-slate-600 dark:text-slate-300'
+                                }`}
+                                title="Set 3 Hours OT"
+                              >
+                                +3h
+                              </button>
+                              {ot > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetOvertime(emp.id, 0)}
+                                  className="px-1 py-0.5 text-[9.5px] font-bold rounded text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                                  title="Clear OT to 0"
+                                >
+                                  ✕
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Quick Status Buttons */}
@@ -646,16 +832,20 @@ export default function MarkAttendanceView({
                           onClick={() => setActiveNoteModal({
                             empId: emp.id,
                             name: emp.name,
+                            status: status || 'present',
                             note: rec?.note || '',
-                            clockIn: rec?.clockIn || '09:30 AM',
+                            clockIn: rec?.clockIn || '09:25 AM',
                             clockOut: rec?.clockOut || '06:30 PM',
+                            overtimeHours: (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
+                              ? Number(rec.overtimeHours)
+                              : 0,
                           })}
                           className={`p-2 rounded-xl transition-colors ${
                             rec?.note 
                               ? 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300 font-bold' 
                               : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
                           }`}
-                          title={rec?.note ? `Note: ${rec.note}` : 'Edit timings / note'}
+                          title={rec?.note ? `Note: ${rec.note}` : 'Edit timings, OT & remarks'}
                         >
                           <FileText className="w-4 h-4" />
                         </button>
@@ -741,6 +931,163 @@ export default function MarkAttendanceView({
           <span>Confirm & Lock Timesheet</span>
         </button>
       </div>
+
+      {/* Punch Timings & Overtime / Note Modal */}
+      {activeNoteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-5 animate-scale-up">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="font-bold text-slate-900 dark:text-white text-base flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-blue-500" />
+                  <span>Punch Timings & Overtime Log</span>
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                  {activeNoteModal.name} ({activeNoteModal.empId}) • <span className="font-semibold text-blue-600 dark:text-blue-400">{selectedDate}</span>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveNoteModal(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTimingsModal} className="space-y-4">
+              {/* Status Selector */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Attendance Status
+                </label>
+                <select
+                  value={activeNoteModal.status || 'present'}
+                  onChange={(e) => setActiveNoteModal({ ...activeNoteModal, status: e.target.value })}
+                  className="w-full px-3.5 py-2.5 text-xs font-bold bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="present">Present (In-Office)</option>
+                  <option value="wfh">Work From Home (WFH)</option>
+                  <option value="week_off">Week Off (WO)</option>
+                  <option value="half_day">Half Day (0.5)</option>
+                  <option value="late">Late Arrival</option>
+                  <option value="leave">Approved Paid Leave</option>
+                  <option value="absent">Loss of Pay (LWP / Absent)</option>
+                </select>
+              </div>
+
+              {/* Timings */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Clock In Time
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 09:25 AM"
+                    value={activeNoteModal.clockIn || ''}
+                    onChange={(e) => setActiveNoteModal({ ...activeNoteModal, clockIn: e.target.value })}
+                    className="w-full px-3.5 py-2 text-xs font-mono font-bold bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                    Clock Out Time
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 06:30 PM"
+                    value={activeNoteModal.clockOut || ''}
+                    onChange={(e) => setActiveNoteModal({ ...activeNoteModal, clockOut: e.target.value })}
+                    className="w-full px-3.5 py-2 text-xs font-mono font-bold bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* OVERTIME (HOURS) SECTION */}
+              <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-800/60 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                    <span>Overtime (OT) Hours:</span>
+                  </label>
+                  <span className="text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                    1.5x Hourly Rate Applicable
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="24"
+                      value={activeNoteModal.overtimeHours ?? 0}
+                      onChange={(e) => setActiveNoteModal({ ...activeNoteModal, overtimeHours: Math.max(0, parseFloat(e.target.value) || 0) })}
+                      className="w-full px-3.5 py-2 text-sm font-black font-mono bg-white dark:bg-slate-900 border border-amber-300 dark:border-amber-700 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder="0"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-amber-600 dark:text-amber-400">
+                      Hours
+                    </span>
+                  </div>
+
+                  {/* Quick buttons */}
+                  <div className="flex items-center gap-1">
+                    {[0, 1, 2, 3, 4, 6].map((hrs) => (
+                      <button
+                        key={hrs}
+                        type="button"
+                        onClick={() => setActiveNoteModal({ ...activeNoteModal, overtimeHours: hrs })}
+                        className={`px-2 py-2 text-xs font-bold rounded-xl transition-all ${
+                          Number(activeNoteModal.overtimeHours) === hrs
+                            ? 'bg-amber-500 text-white shadow-xs scale-105'
+                            : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-amber-100 dark:hover:bg-amber-950/40'
+                        }`}
+                      >
+                        {hrs === 0 ? '0h' : `+${hrs}h`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Remarks / Reason */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Shift Notes / Reason for Overtime
+                </label>
+                <textarea
+                  rows="2"
+                  placeholder="e.g. Urgent client delivery / Machine breakdown maintenance / Approved extra hours"
+                  value={activeNoteModal.note || ''}
+                  onChange={(e) => setActiveNoteModal({ ...activeNoteModal, note: e.target.value })}
+                  className="w-full px-3.5 py-2 text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                ></textarea>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveNoteModal(null)}
+                  className="px-4 py-2.5 text-xs font-bold rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 text-xs font-black rounded-2xl bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 flex items-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Save Timings &amp; OT</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
