@@ -121,6 +121,9 @@ export default function App() {
       sounds.playSuccess();
     }
     setCurrentUser(null);
+    setSelectedEmployee(null);
+    setCurrentTab('dashboard');
+    setIsUserAccessOpen(false);
     setIsIdleWarningOpen(false);
     setLogoutNotice(reason);
 
@@ -354,6 +357,8 @@ export default function App() {
           setTheme={setTheme}
           onLoginSuccess={(auth) => {
             setCurrentUser(auth);
+            setSelectedEmployee(null);
+            setCurrentTab('dashboard');
             setLogoutNotice(null);
             if (auth.role === 'admin') {
               triggerToast("Authenticated as HR Administrator");
@@ -374,7 +379,15 @@ export default function App() {
 
   // 2. EMPLOYEE ROLE: Render Dedicated Self-Service Portal Only (Strict Data Isolation)
   if (currentUser.role === 'employee') {
-    const activeEmployee = employees.find(e => e.id === currentUser.employee?.id || e.id === currentUser.user?.id) || currentUser.employee || currentUser.user;
+    const activeEmployee = employees.find(e => e.id === currentUser.employee?.id || e.id === currentUser.user?.id) || currentUser.employee || currentUser.user || {
+      id: currentUser.user?.id || currentUser.employee?.id || 'EMP-101',
+      name: currentUser.user?.name || currentUser.employee?.name || 'Staff Member',
+      role: 'Team Member',
+      department: 'Operations',
+      designation: 'Staff',
+      salaryMonthly: 25000,
+      avatar: `https://ui-avatars.com/api/?name=Staff+Member&background=3b82f6&color=fff`
+    };
 
     return (
       <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
@@ -458,9 +471,14 @@ export default function App() {
 
   // 3. ADMIN & MANAGER ROLES: Render Corporate Workspace (Scoped by Role)
   const isManager = currentUser.role === 'manager';
-  const effectiveTab = (isManager && (currentTab === 'settings' || currentTab === 'audit')) 
-    ? 'dashboard' 
-    : currentTab;
+  const VALID_ADMIN_TABS = ['dashboard', 'mark', 'monthly', 'kiosk', 'employees', 'leaves', 'reports', 'audit', 'settings'];
+  let effectiveTab = currentTab;
+  if (!VALID_ADMIN_TABS.includes(effectiveTab)) {
+    effectiveTab = 'dashboard';
+  }
+  if (isManager && (effectiveTab === 'settings' || effectiveTab === 'audit')) {
+    effectiveTab = 'dashboard';
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">

@@ -30,15 +30,28 @@ import { getEmployeeTotalAdvance } from '../utils/storage';
 import SalarySlipModal from './SalarySlipModal';
 
 export default function EmployeePortalView({ 
-  employee, 
-  attendance, 
+  employee: rawEmployee, 
+  attendance = {}, 
   setAttendance, 
-  leaves, 
+  leaves = [], 
   setLeaves, 
   advances = [],
-  config, 
+  config = {}, 
   onSaveToast 
 }) {
+  const employee = {
+    id: rawEmployee?.id || 'EMP-101',
+    name: rawEmployee?.name || 'Staff Member',
+    role: rawEmployee?.role || rawEmployee?.designation || 'Team Member',
+    department: rawEmployee?.department || 'Operations',
+    shift: rawEmployee?.shift || 'General (09:30 AM - 06:30 PM)',
+    reportsTo: rawEmployee?.reportsTo || 'Manager',
+    salaryMonthly: rawEmployee?.salaryMonthly || 25000,
+    avatar: rawEmployee?.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(rawEmployee?.name || 'Staff')}&background=3b82f6&color=fff`,
+    leaveBalance: rawEmployee?.leaveBalance || { cl: 12, sl: 8, pl: 15 },
+    statutoryType: rawEmployee?.statutoryType || 'standard',
+    ...(rawEmployee || {})
+  };
   const [currentTime, setCurrentTime] = useState(new Date());
   const [punchMode, setPunchMode] = useState('office'); // 'office' | 'wfh'
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'monthly' | 'leaves' | 'payslip'

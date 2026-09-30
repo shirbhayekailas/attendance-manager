@@ -12,7 +12,8 @@ import {
   FileSpreadsheet,
   ChevronDown,
   ShieldCheck,
-  Globe
+  Globe,
+  KeyRound
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
 
@@ -28,6 +29,7 @@ export default function Navbar({
   onOpenSearch,
   currentUser,
   onLogout,
+  onOpenUserAccess,
   syncStatus = 'synced'
 }) {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -37,7 +39,7 @@ export default function Navbar({
 
   const isAdmin = currentUser?.role === 'admin';
   const isManager = currentUser?.role === 'manager';
-  const employee = currentUser?.employee || null;
+  const employee = currentUser?.employee || currentUser?.user || null;
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);

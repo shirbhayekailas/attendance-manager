@@ -32,6 +32,11 @@ export default function MemberProfileModal({
   onClose 
 }) {
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+  const [activeProfileTab, setActiveProfileTab] = useState('monthly'); // 'monthly' | 'heatmap' | 'history'
+  const today = new Date();
+  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
+
   useEffect(() => {
     document.body.classList.add('modal-print-active');
     return () => {
@@ -40,11 +45,6 @@ export default function MemberProfileModal({
   }, []);
 
   if (!employee) return null;
-
-  const [activeProfileTab, setActiveProfileTab] = useState('monthly'); // 'monthly' | 'heatmap' | 'history'
-  const today = new Date();
-  const [selectedYear, setSelectedYear] = useState(today.getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState(today.getMonth());
 
   const stats = calculateEmployeeStats(employee.id, attendance);
 
