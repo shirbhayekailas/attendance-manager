@@ -179,6 +179,13 @@ export function generateCorporateHistory(emps) {
   return history;
 }
 
+export function normalizeOrgId(rawOrgId) {
+  if (!rawOrgId) return 'sk_enterprises';
+  const clean = String(rawOrgId).trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_');
+  if (!clean || clean === 'default' || clean === 'sk-ent' || clean === 'sk_ent') return 'sk_enterprises';
+  return clean;
+}
+
 // In-memory cache for fast response times
 let inMemoryDB = null;
 
@@ -240,9 +247,28 @@ export async function initDatabase() {
         ],
         lastUpdated: new Date().toISOString(),
       };
-
-      await saveDatabaseFile(inMemoryDB);
     }
+
+    // Ensure tenants partition exists
+    if (!inMemoryDB.tenants) {
+      inMemoryDB.tenants = {};
+    }
+    if (!inMemoryDB.tenants['sk_enterprises']) {
+      inMemoryDB.tenants['sk_enterprises'] = {
+        id: 'sk_enterprises',
+        name: inMemoryDB.config?.companyName || defaultCompanyConfig.companyName,
+        employees: inMemoryDB.employees || DEMO_SAMPLE_EMPLOYEES,
+        attendance: inMemoryDB.attendance || generateCorporateHistory(DEMO_SAMPLE_EMPLOYEES),
+        leaves: inMemoryDB.leaves || [],
+        advances: inMemoryDB.advances || [],
+        expenses: inMemoryDB.expenses || [],
+        config: inMemoryDB.config || defaultCompanyConfig,
+        adminCreds: inMemoryDB.adminCreds || defaultAdminCreds,
+        lastUpdated: inMemoryDB.lastUpdated || new Date().toISOString(),
+      };
+    }
+
+    await saveDatabaseFile(inMemoryDB);
   } catch (err) {
     console.error("Database initialization error:", err);
     inMemoryDB = {
@@ -254,6 +280,20 @@ export async function initDatabase() {
       config: defaultCompanyConfig,
       adminCreds: defaultAdminCreds,
       audit: [],
+      tenants: {
+        sk_enterprises: {
+          id: 'sk_enterprises',
+          name: defaultCompanyConfig.companyName,
+          employees: [],
+          attendance: {},
+          leaves: [],
+          advances: [],
+          expenses: [],
+          config: defaultCompanyConfig,
+          adminCreds: defaultAdminCreds,
+          lastUpdated: new Date().toISOString(),
+        }
+      },
       lastUpdated: new Date().toISOString(),
     };
   }
@@ -267,48 +307,104 @@ async function saveDatabaseFile(data) {
   await fs.promises.rename(tmpFile, DB_FILE);
 }
 
-export function getDatabase() {
+export function getDatabase(orgId) {
+  const normId = normalizeOrgId(orgId);
   if (!inMemoryDB) {
-    // Synchronous fallback read if called before async init completes
     if (fs.existsSync(DB_FILE)) {
       try {
         inMemoryDB = JSON.parse(fs.readFileSync(DB_FILE, 'utf-8'));
       } catch (e) {
         inMemoryDB = {};
       }
+    } else {
+      inMemoryDB = {};
     }
   }
-  return inMemoryDB || {};
+
+  if (!inMemoryDB.tenants) {
+    inMemoryDB.tenants = {};
+  }
+
+  if (!inMemoryDB.tenants['sk_enterprises']) {
+    inMemoryDB.tenants['sk_enterprises'] = {
+      id: 'sk_enterprises',
+      name: inMemoryDB.config?.companyName || defaultCompanyConfig.companyName,
+      employees: inMemoryDB.employees || DEMO_SAMPLE_EMPLOYEES,
+      attendance: inMemoryDB.attendance || generateCorporateHistory(DEMO_SAMPLE_EMPLOYEES),
+      leaves: inMemoryDB.leaves || [],
+      advances: inMemoryDB.advances || [],
+      expenses: inMemoryDB.expenses || [],
+      config: inMemoryDB.config || defaultCompanyConfig,
+      adminCreds: inMemoryDB.adminCreds || defaultAdminCreds,
+      lastUpdated: inMemoryDB.lastUpdated || new Date().toISOString(),
+    };
+  }
+
+  if (!inMemoryDB.tenants[normId]) {
+    inMemoryDB.tenants[normId] = {
+      id: normId,
+      name: normId.toUpperCase(),
+      employees: [],
+      attendance: {},
+      leaves: [],
+      advances: [],
+      expenses: [],
+      config: { ...defaultCompanyConfig, companyName: normId.toUpperCase() },
+      adminCreds: defaultAdminCreds,
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+
+  return inMemoryDB.tenants[normId];
 }
 
-export async function updateDatabase(updaterFn) {
-  const current = getDatabase();
-  const updated = typeof updaterFn === 'function' ? updaterFn(current) : { ...current, ...updaterFn };
-  updated.lastUpdated = new Date().toISOString();
-  inMemoryDB = updated;
+export async function updateDatabase(updaterFn, orgId) {
+  const normId = normalizeOrgId(orgId);
+  const currentTenant = getDatabase(normId);
+  const updatedTenant = typeof updaterFn === 'function' ? updaterFn(currentTenant) : { ...currentTenant, ...updaterFn };
+  updatedTenant.lastUpdated = new Date().toISOString();
+
+  if (!inMemoryDB.tenants) {
+    inMemoryDB.tenants = {};
+  }
+  inMemoryDB.tenants[normId] = updatedTenant;
+  inMemoryDB.lastUpdated = updatedTenant.lastUpdated;
+
+  if (normId === 'sk_enterprises') {
+    inMemoryDB.employees = updatedTenant.employees;
+    inMemoryDB.attendance = updatedTenant.attendance;
+    inMemoryDB.leaves = updatedTenant.leaves;
+    inMemoryDB.advances = updatedTenant.advances;
+    inMemoryDB.expenses = updatedTenant.expenses;
+    inMemoryDB.config = updatedTenant.config;
+    inMemoryDB.adminCreds = updatedTenant.adminCreds;
+  }
+
   await saveDatabaseFile(inMemoryDB);
-  return inMemoryDB;
+  return updatedTenant;
 }
 
-export async function resetToDemo() {
+export async function resetToDemo(orgId) {
   const freshHistory = generateCorporateHistory(DEMO_SAMPLE_EMPLOYEES);
   return await updateDatabase({
     employees: DEMO_SAMPLE_EMPLOYEES,
     attendance: freshHistory,
     leaves: [],
     advances: [],
+    expenses: [],
     adminCreds: defaultAdminCreds,
     config: defaultCompanyConfig,
-  });
+  }, orgId);
 }
 
-export async function wipeToClean() {
+export async function wipeToClean(orgId) {
   return await updateDatabase({
     employees: [],
     attendance: {},
     leaves: [],
     advances: [],
+    expenses: [],
     adminCreds: defaultAdminCreds,
     config: defaultCompanyConfig,
-  });
+  }, orgId);
 }

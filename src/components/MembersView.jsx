@@ -44,8 +44,10 @@ export default function MembersView({
   config = {}, 
   setConfig,
   onSelectEmployee, 
-  onSaveToast 
+  onSaveToast,
+  role = 'admin' 
 }) {
+  const isManager = role === 'manager';
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [selectedRoleFilter, setSelectedRoleFilter] = useState('All');
@@ -535,7 +537,7 @@ export default function MembersView({
                       <span>Shift: {emp.shift}</span>
                     </div>
                   )}
-                  {emp.bankAccountNo && (
+                  {emp.bankAccountNo && !isManager && (
                     <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
                       <CreditCard className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                       <span>{emp.bankName || 'Bank'}: •••• {emp.bankAccountNo.slice(-4)}</span>
@@ -586,13 +588,15 @@ export default function MembersView({
                   >
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
-                  <button
-                    onClick={() => handleDelete(emp)}
-                    className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60"
-                    title="Remove user"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {!isManager && (
+                    <button
+                      onClick={() => handleDelete(emp)}
+                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/60"
+                      title="Remove user"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

@@ -9,11 +9,23 @@ let isSyncing = false;
 let syncQueue = null;
 let lastServerTimestamp = null;
 
-// Fetch entire database state from server
-export async function fetchServerSync() {
+export function getActiveOrgId() {
   try {
-    const res = await fetch(`${API_BASE}/api/sync`, {
-      headers: { 'Accept': 'application/json' },
+    return localStorage.getItem('staffpulse_org_id_v4') || 'sk_enterprises';
+  } catch (e) {
+    return 'sk_enterprises';
+  }
+}
+
+// Fetch entire database state from server
+export async function fetchServerSync(customOrgId = null) {
+  const orgId = customOrgId || getActiveOrgId();
+  try {
+    const res = await fetch(`${API_BASE}/api/sync?orgId=${encodeURIComponent(orgId)}`, {
+      headers: { 
+        'Accept': 'application/json',
+        'x-org-id': orgId
+      },
     });
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const data = await res.json();
@@ -29,10 +41,11 @@ export async function fetchServerSync() {
 }
 
 // Push local state updates to server database
-export async function pushServerSync(payload) {
+export async function pushServerSync(payload, customOrgId = null) {
+  const orgId = customOrgId || getActiveOrgId();
   if (isSyncing) {
     // Queue up the latest payload to avoid race conditions
-    syncQueue = payload;
+    syncQueue = { payload, orgId };
     return;
   }
 
@@ -42,8 +55,9 @@ export async function pushServerSync(payload) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-org-id': orgId,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, orgId }),
     });
 
     if (res.ok) {
@@ -55,10 +69,62 @@ export async function pushServerSync(payload) {
   } finally {
     isSyncing = false;
     if (syncQueue) {
-      const nextPayload = syncQueue;
+      const next = syncQueue;
       syncQueue = null;
-      await pushServerSync(nextPayload);
+      await pushServerSync(next.payload, next.orgId);
     }
+  }
+}
+
+// Remote Authentication against cloud server
+export async function loginOnServer({ identifier, password, orgId = 'sk_enterprises' }) {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-org-id': orgId
+      },
+      body: JSON.stringify({ identifier, password, orgId })
+    });
+    const data = await res.json();
+    return data;
+  } catch (err) {
+    return { success: false, message: err.message };
+  }
+}
+
+// Update User PIN on server
+export async function updateUserPinOnServer({ empId, newPin, orgId = 'sk_enterprises' }) {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/pin`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-org-id': orgId
+      },
+      body: JSON.stringify({ empId, newPin, orgId })
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Update User Role on server (RBAC)
+export async function updateUserRoleOnServer({ empId, newRole, orgId = 'sk_enterprises' }) {
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/role`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-org-id': orgId
+      },
+      body: JSON.stringify({ empId, newRole, orgId })
+    });
+    return await res.json();
+  } catch (err) {
+    return { success: false, error: err.message };
   }
 }
 

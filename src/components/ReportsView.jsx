@@ -33,9 +33,11 @@ export default function ReportsView({
   expenses = [],
   setExpenses,
   config, 
-  onSaveToast 
+  onSaveToast,
+  role = 'admin' 
 }) {
-  const [activeReportTab, setActiveReportTab] = useState('payroll');
+  const isManager = role === 'manager';
+  const [activeReportTab, setActiveReportTab] = useState(isManager ? 'matrix' : 'payroll');
   const [rangeFilter, setRangeFilter] = useState('30');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPayslipEmp, setSelectedPayslipEmp] = useState(null);
@@ -309,23 +311,27 @@ _This is a computer-generated salary slip from SK ENTERPRISES._`;
             </button>
           </div>
 
-          <button
-            onClick={handleExportBankTransferCSV}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 transition-colors shadow-xs"
-            title="Download Bank Salary Transfer NEFT/RTGS Excel/CSV"
-          >
-            <Building className="w-3.5 h-3.5" />
-            <span>Bank NEFT File</span>
-          </button>
+          {!isManager && (
+            <button
+              onClick={handleExportBankTransferCSV}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 transition-colors shadow-xs"
+              title="Download Bank Salary Transfer NEFT/RTGS Excel/CSV"
+            >
+              <Building className="w-3.5 h-3.5" />
+              <span>Bank NEFT File</span>
+            </button>
+          )}
 
-          <button
-            onClick={() => setIsBatchSlipsOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 transition-colors shadow-xs"
-            title="Print or Save All Employee Payslips in One PDF Job"
-          >
-            <Printer className="w-3.5 h-3.5" />
-            <span>Print All Slips (Batch)</span>
-          </button>
+          {!isManager && (
+            <button
+              onClick={() => setIsBatchSlipsOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 transition-colors shadow-xs"
+              title="Print or Save All Employee Payslips in One PDF Job"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print All Slips (Batch)</span>
+            </button>
+          )}
 
           <button
             onClick={() => {

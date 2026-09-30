@@ -225,31 +225,43 @@ export default function Navbar({
               )}
             </button>
 
+            {/* Admin User Access & PINs Manager Button */}
+            {isAdmin && onOpenUserAccess && (
+              <button
+                onClick={onOpenUserAccess}
+                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-xs font-bold transition active:scale-95 shadow-xs"
+                title="Manage Employee Roles, Access & Login PINs"
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                <span>User PINs / Access</span>
+              </button>
+            )}
+
             {/* User Profile Info & Switch/Logout */}
             <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
               {isAdmin ? (
                 <>
-                  <img
-                    src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80"
-                    alt="Sarah Jenkins HR"
-                    className="w-8 h-8 rounded-full object-cover border-2 border-blue-500/40"
-                  />
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-white font-bold text-xs border-2 border-amber-400/50 shadow-xs">
+                    👑
+                  </div>
                   <div className="hidden xl:block text-left text-xs">
-                    <span className="font-bold text-slate-900 dark:text-white block leading-tight">Sarah Jenkins</span>
-                    <span className="text-[10px] text-blue-500 font-semibold">HR Administrator</span>
+                    <span className="font-bold text-slate-900 dark:text-white block leading-tight">
+                      {config?.companyName ? `${config.companyName} Admin` : 'Company Admin'}
+                    </span>
+                    <span className="text-[10px] text-amber-500 font-extrabold uppercase">Owner / HR Head</span>
                   </div>
                 </>
               ) : employee ? (
                 <>
                   <img
-                    src={employee.avatar}
+                    src={employee.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(employee.name)}&background=3b82f6&color=fff`}
                     alt={employee.name}
                     className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500/40"
                   />
                   <div className="hidden xl:block text-left text-xs">
                     <span className="font-bold text-slate-900 dark:text-white block leading-tight">{employee.name}</span>
                     <span className="text-[10px] font-semibold text-slate-400">
-                      {isManager ? '💼 Manager' : '👤 Employee'} • {employee.department}
+                      {isManager ? '👔 Site Supervisor' : '👤 Employee'} • {employee.department || 'Operations'}
                     </span>
                   </div>
                 </>

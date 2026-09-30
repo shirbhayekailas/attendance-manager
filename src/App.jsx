@@ -16,6 +16,7 @@ import EmployeePortalView from './components/EmployeePortalView';
 import MonthlyAttendanceView from './components/MonthlyAttendanceView';
 import Toast from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
+import UserAccessModal from './components/UserAccessModal';
 
 import { 
   INITIAL_EMPLOYEES, 
@@ -68,14 +69,114 @@ export default function App() {
 
   const isInitialSyncDone = useRef(false);
 
+  // -------------------------------------------------------------
+  // SESSION SECURITY & INACTIVITY AUTO-LOGOUT CONFIG (Blinkit Style)
+  // -------------------------------------------------------------
+  const IDLE_TIMEOUT_MS = 10 * 60 * 1000; // 10 Minutes Inactivity Auto-Logout
+  const WARNING_TIMEOUT_MS = 9 * 60 * 1000; // 9 Minutes (shows 60s countdown warning)
+
+  const [isIdleWarningOpen, setIsIdleWarningOpen] = useState(false);
+  const [countdownSeconds, setCountdownSeconds] = useState(60);
+  const [isUserAccessOpen, setIsUserAccessOpen] = useState(false);
+  const [logoutNotice, setLogoutNotice] = useState(() => {
+    try {
+      const lastActive = Number(localStorage.getItem('staffpulse_last_active') || 0);
+      const hadSession = localStorage.getItem('staffpulse_had_session');
+      if (hadSession && lastActive && Date.now() - lastActive >= 10 * 60 * 1000) {
+        localStorage.removeItem('staffpulse_had_session');
+        return 'inactivity';
+      }
+    } catch (e) {}
+    return null;
+  });
+  const lastActiveRef = useRef(Date.now());
+
   // Authentication & RBAC User State
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('staffpulse_user_v4');
-      if (saved) return JSON.parse(saved);
-    } catch (e) {}
-    return null; // Prompt login by default
+      const saved = sessionStorage.getItem('staffpulse_user_v4') || localStorage.getItem('staffpulse_user_v4');
+      const lastActive = Number(sessionStorage.getItem('staffpulse_last_active') || localStorage.getItem('staffpulse_last_active') || 0);
+
+      // If active session exists and last active was within 10 minutes
+      if (saved && lastActive && (Date.now() - lastActive < IDLE_TIMEOUT_MS)) {
+        return JSON.parse(saved);
+      }
+
+      // Purge any stale session
+      sessionStorage.removeItem('staffpulse_user_v4');
+      sessionStorage.removeItem('staffpulse_last_active');
+      localStorage.removeItem('staffpulse_user_v4');
+      localStorage.removeItem('staffpulse_last_active');
+      return null;
+    } catch (e) {
+      return null;
+    }
   });
+
+  // Master Logout Handler (Inactivity or Manual)
+  const handleLogout = (reason = 'manual') => {
+    if (reason === 'inactivity') {
+      sounds.playWarning();
+    } else {
+      sounds.playSuccess();
+    }
+    setCurrentUser(null);
+    setIsIdleWarningOpen(false);
+    setLogoutNotice(reason);
+
+    try {
+      sessionStorage.removeItem('staffpulse_user_v4');
+      sessionStorage.removeItem('staffpulse_last_active');
+      localStorage.removeItem('staffpulse_user_v4');
+      localStorage.removeItem('staffpulse_last_active');
+      localStorage.removeItem('staffpulse_had_session');
+    } catch (e) {}
+
+    triggerToast(reason === 'inactivity' ? 'Session timed out due to screen inactivity.' : 'Logged out successfully.');
+  };
+
+  // Inactivity Auto-Logout Watcher (Screen Idle timer)
+  useEffect(() => {
+    if (!currentUser) return;
+
+    lastActiveRef.current = Date.now();
+    sessionStorage.setItem('staffpulse_last_active', String(Date.now()));
+    localStorage.setItem('staffpulse_last_active', String(Date.now()));
+    localStorage.setItem('staffpulse_had_session', 'true');
+
+    const resetActivity = () => {
+      lastActiveRef.current = Date.now();
+      sessionStorage.setItem('staffpulse_last_active', String(Date.now()));
+      localStorage.setItem('staffpulse_last_active', String(Date.now()));
+      setIsIdleWarningOpen(false);
+    };
+
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(evt => {
+      window.addEventListener(evt, resetActivity, { passive: true });
+    });
+
+    const intervalId = setInterval(() => {
+      const elapsed = Date.now() - lastActiveRef.current;
+
+      if (elapsed >= IDLE_TIMEOUT_MS) {
+        handleLogout('inactivity');
+      } else if (elapsed >= WARNING_TIMEOUT_MS) {
+        setIsIdleWarningOpen(true);
+        const remaining = Math.max(1, Math.ceil((IDLE_TIMEOUT_MS - elapsed) / 1000));
+        setCountdownSeconds(remaining);
+      } else {
+        setIsIdleWarningOpen(false);
+      }
+    }, 1000);
+
+    return () => {
+      activityEvents.forEach(evt => {
+        window.removeEventListener(evt, resetActivity);
+      });
+      clearInterval(intervalId);
+    };
+  }, [currentUser]);
 
   // Sync theme
   useEffect(() => {
@@ -90,8 +191,13 @@ export default function App() {
   // Sync session user
   useEffect(() => {
     if (currentUser) {
+      sessionStorage.setItem('staffpulse_user_v4', JSON.stringify(currentUser));
       localStorage.setItem('staffpulse_user_v4', JSON.stringify(currentUser));
+      sessionStorage.setItem('staffpulse_last_active', String(Date.now()));
+      localStorage.setItem('staffpulse_last_active', String(Date.now()));
+      localStorage.setItem('staffpulse_had_session', 'true');
     } else {
+      sessionStorage.removeItem('staffpulse_user_v4');
       localStorage.removeItem('staffpulse_user_v4');
     }
   }, [currentUser]);
@@ -242,14 +348,19 @@ export default function App() {
           employees={employees}
           adminCreds={adminCreds}
           config={config}
+          logoutNotice={logoutNotice}
+          onClearLogoutNotice={() => setLogoutNotice(null)}
+          theme={theme}
+          setTheme={setTheme}
           onLoginSuccess={(auth) => {
             setCurrentUser(auth);
+            setLogoutNotice(null);
             if (auth.role === 'admin') {
               triggerToast("Authenticated as HR Administrator");
             } else if (auth.role === 'manager') {
-              triggerToast(`Welcome back, Manager ${auth.employee.name}!`);
+              triggerToast(`Welcome back, Manager ${auth.user?.name || auth.employee?.name || ''}!`);
             } else {
-              triggerToast(`Welcome to your station, ${auth.employee.name}!`);
+              triggerToast(`Welcome to your station, ${auth.user?.name || auth.employee?.name || ''}!`);
             }
           }}
         />
@@ -261,9 +372,9 @@ export default function App() {
     );
   }
 
-  // 2. EMPLOYEE ROLE: Render Dedicated Self-Service Portal Only
+  // 2. EMPLOYEE ROLE: Render Dedicated Self-Service Portal Only (Strict Data Isolation)
   if (currentUser.role === 'employee') {
-    const activeEmployee = employees.find(e => e.id === currentUser.employee?.id) || currentUser.employee;
+    const activeEmployee = employees.find(e => e.id === currentUser.employee?.id || e.id === currentUser.user?.id) || currentUser.employee || currentUser.user;
 
     return (
       <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-200">
@@ -276,10 +387,7 @@ export default function App() {
           currentUser={currentUser}
           notifications={INITIAL_NOTIFICATIONS}
           syncStatus={syncStatus}
-          onLogout={() => {
-            setCurrentUser(null);
-            triggerToast("Logged out of Employee Portal");
-          }}
+          onLogout={() => handleLogout('manual')}
         />
 
         {/* Employee Self-Service Workspace */}
@@ -298,6 +406,47 @@ export default function App() {
             />
           </ErrorBoundary>
         </main>
+
+        {/* Screen Inactivity Warning Modal (Exact Blinkit UX) */}
+        {isIdleWarningOpen && currentUser && (
+          <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-amber-400 dark:border-amber-600/80 p-6 space-y-4 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/70 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto text-2xl shadow-xs animate-pulse">
+                ⏰
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  Screen Inactivity Alert
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  Security ke liye aapka session <strong className="text-rose-600 font-extrabold text-sm">{countdownSeconds}s</strong> mein auto-logout ho jayega.
+                </p>
+              </div>
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    lastActiveRef.current = Date.now();
+                    sessionStorage.setItem('staffpulse_last_active', String(Date.now()));
+                    localStorage.setItem('staffpulse_last_active', String(Date.now()));
+                    setIsIdleWarningOpen(false);
+                    sounds.playSuccess();
+                  }}
+                  className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md transition transform active:scale-98"
+                >
+                  Main Active Hoon (Continue Session)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleLogout('manual')}
+                  className="w-full py-2 text-xs font-bold text-slate-400 hover:text-rose-600 transition"
+                >
+                  Abhi Logout Karein
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <Toast
           message={toastMessage}
@@ -324,10 +473,8 @@ export default function App() {
         setTheme={setTheme}
         currentUser={currentUser}
         syncStatus={syncStatus}
-        onLogout={() => {
-          setCurrentUser(null);
-          triggerToast("Logged out successfully.");
-        }}
+        onLogout={() => handleLogout('manual')}
+        onOpenUserAccess={() => setIsUserAccessOpen(true)}
         onResetDemo={handleResetDemoData}
         notifications={INITIAL_NOTIFICATIONS}
         onOpenSearch={() => setIsSearchOpen(true)}
@@ -406,6 +553,7 @@ export default function App() {
               setConfig={setConfig}
               onSelectEmployee={setSelectedEmployee}
               onSaveToast={triggerToast}
+              role={currentUser.role}
             />
           )}
 
@@ -429,6 +577,7 @@ export default function App() {
               setExpenses={setExpenses}
               config={config}
               onSaveToast={triggerToast}
+              role={currentUser.role}
             />
           )}
 
@@ -481,6 +630,64 @@ export default function App() {
             onClose={() => setSelectedEmployee(null)}
           />
         </ErrorBoundary>
+      )}
+
+      {/* Team Access & Security PIN Manager Modal */}
+      {isUserAccessOpen && (
+        <UserAccessModal
+          isOpen={isUserAccessOpen}
+          onClose={() => setIsUserAccessOpen(false)}
+          employees={employees}
+          setEmployees={setEmployees}
+          adminCreds={adminCreds}
+          setAdminCreds={setAdminCreds}
+          config={config}
+          onSaveToast={triggerToast}
+        />
+      )}
+
+      {/* SCREEN INACTIVITY ALERT MODAL (Exact Blinkit UX) */}
+      {isIdleWarningOpen && currentUser && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-amber-400 dark:border-amber-600/80 p-6 space-y-4 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-100 dark:bg-amber-950/70 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto text-2xl shadow-xs animate-pulse">
+              ⏰
+            </div>
+            
+            <div className="space-y-1">
+              <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                Screen Inactivity Alert
+              </h3>
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                Security ke liye aapka session <strong className="text-rose-600 font-extrabold text-sm">{countdownSeconds}s</strong> mein auto-logout ho jayega.
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  lastActiveRef.current = Date.now();
+                  sessionStorage.setItem('staffpulse_last_active', String(Date.now()));
+                  localStorage.setItem('staffpulse_last_active', String(Date.now()));
+                  setIsIdleWarningOpen(false);
+                  sounds.playSuccess();
+                }}
+                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md transition transform active:scale-98"
+              >
+                Main Active Hoon (Continue Session)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleLogout('manual')}
+                className="w-full py-2 text-xs font-bold text-slate-400 hover:text-rose-600 transition"
+              >
+                Abhi Logout Karein
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Floating Animated Toast */}
