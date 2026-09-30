@@ -126,9 +126,9 @@ export default function MonthlyAttendanceView({
           status: statusToSet,
           clockIn: (statusToSet === 'present' || statusToSet === 'late') ? '09:30 AM' : statusToSet === 'wfh' ? '09:30 AM (WFH)' : '--',
           clockOut: (statusToSet === 'present' || statusToSet === 'wfh' || statusToSet === 'late') ? '06:30 PM' : '--',
-          workingHours: (statusToSet === 'present' || statusToSet === 'wfh' || statusToSet === 'late') ? '9h 00m' : statusToSet === 'half_day' ? '4h 30m' : (statusToSet === 'week_off' || statusToSet === 'leave' || statusToSet === 'absent') ? '0h 00m' : '--',
+          workingHours: (statusToSet === 'present' || statusToSet === 'wfh' || statusToSet === 'late') ? '9h 00m' : statusToSet === 'holiday' ? '8h 00m' : statusToSet === 'half_day' ? '4h 30m' : (statusToSet === 'week_off' || statusToSet === 'leave' || statusToSet === 'absent') ? '0h 00m' : '--',
           overtimeHours: Math.max(0, resolvedOt),
-          note: statusToSet === 'week_off' ? 'Scheduled Week Off (WO)' : (dayRecords[empId]?.note || `Marked via Monthly Matrix`)
+          note: statusToSet === 'week_off' ? 'Scheduled Week Off (WO)' : statusToSet === 'holiday' ? 'Public / Paid Festival Holiday (PH)' : (dayRecords[empId]?.note || `Marked via Monthly Matrix`)
         }
       };
     }
@@ -141,7 +141,35 @@ export default function MonthlyAttendanceView({
     setAttendance(updated);
     sounds.playSuccess();
     setEditingCell(null);
-    onSaveToast(`Updated ${editingCell.empName} on ${dateStr} (${newStatus === 'clear' ? 'Cleared' : newStatus === 'week_off' ? 'WEEK OFF' : newStatus.toUpperCase()}${resolvedOt > 0 ? ` +${resolvedOt}h OT` : ''})`);
+    onSaveToast(`Updated ${editingCell.empName} on ${dateStr} (${newStatus === 'clear' ? 'Cleared' : newStatus === 'week_off' ? 'WEEK OFF' : newStatus === 'holiday' ? 'PAID HOLIDAY (PH)' : newStatus.toUpperCase()}${resolvedOt > 0 ? ` +${resolvedOt}h OT` : ''})`);
+  };
+
+  // 1-Click Auto-Mark all Sundays in this month as Week Off (WO)
+  const handleAutoMarkSundaysWO = () => {
+    sounds.playSuccess();
+    const updated = { ...attendance };
+    let sundaysCount = 0;
+
+    monthDays.forEach(({ dateStr, dayOfWeek }) => {
+      if (dayOfWeek === 0) { // Sunday
+        sundaysCount++;
+        if (!updated[dateStr]) updated[dateStr] = {};
+        employees.forEach(emp => {
+          updated[dateStr][emp.id] = {
+            ...(updated[dateStr][emp.id] || {}),
+            status: 'week_off',
+            clockIn: '--',
+            clockOut: '--',
+            workingHours: '0h 00m',
+            overtimeHours: 0,
+            note: 'Auto Week Off (Sunday)'
+          };
+        });
+      }
+    });
+
+    setAttendance(updated);
+    onSaveToast(`1-Click Success: Marked all ${sundaysCount} Sundays as Week Off (WO) for all staff!`);
   };
 
   // Helper to get status representation
@@ -163,6 +191,7 @@ export default function MonthlyAttendanceView({
     let leave = 0;
     let absent = 0;
     let weekOff = 0;
+    let holiday = 0;
     let totalOt = 0;
 
     monthDays.forEach(({ dateStr, isWeekend }) => {
@@ -175,13 +204,14 @@ export default function MonthlyAttendanceView({
         else if (rec.status === 'leave') leave++;
         else if (rec.status === 'absent') absent++;
         else if (rec.status === 'week_off' || rec.status === 'wo') weekOff++;
+        else if (rec.status === 'holiday' || rec.status === 'ph') holiday++;
       }
       if (rec?.overtimeHours) {
         totalOt += Number(rec.overtimeHours) || 0;
       }
     });
 
-    const payable = office + wfh + leave + weekOff + (0.5 * halfDay);
+    const payable = office + wfh + leave + weekOff + holiday + (0.5 * halfDay);
 
     return {
       office,
@@ -191,6 +221,7 @@ export default function MonthlyAttendanceView({
       leave,
       absent,
       weekOff,
+      holiday,
       totalOt: Number(totalOt.toFixed(1)),
       payable,
     };
@@ -331,6 +362,15 @@ export default function MonthlyAttendanceView({
           )}
 
           <button
+            onClick={handleAutoMarkSundaysWO}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 transition-colors shadow-xs"
+            title="Auto-mark all Sundays in this month as Week Off (WO) for all staff"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Auto-Mark Sundays (WO)</span>
+          </button>
+
+          <button
             onClick={handleResetToCurrentMonth}
             className="px-3 py-2 text-xs font-semibold rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 transition-colors border border-slate-200 dark:border-slate-700"
           >
@@ -408,8 +448,12 @@ export default function MonthlyAttendanceView({
             <span>Absent</span>
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-md bg-slate-200 dark:bg-slate-800 font-bold text-[9px] text-slate-400 flex items-center justify-center">WO</span>
-            <span>Off</span>
+            <span className="w-3 h-3 rounded-md bg-sky-500 font-bold text-[9px] text-white flex items-center justify-center">WO</span>
+            <span>Week Off</span>
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-md bg-pink-500 font-bold text-[9px] text-white flex items-center justify-center">PH</span>
+            <span>Paid Holiday</span>
           </span>
         </div>
       </div>
@@ -583,6 +627,11 @@ export default function MonthlyAttendanceView({
                               {(status === 'week_off' || status === 'wo') && (
                                 <span className="inline-block w-6 h-6 rounded-lg bg-sky-500 text-white font-bold text-[9px] leading-6 shadow-2xs">
                                   WO
+                                </span>
+                              )}
+                              {(status === 'holiday' || status === 'ph') && (
+                                <span className="inline-block w-6 h-6 rounded-lg bg-pink-500 text-white font-bold text-[9px] leading-6 shadow-2xs" title="Paid Festival Holiday (PH)">
+                                  PH
                                 </span>
                               )}
                               {status === 'weekend' && (
@@ -773,11 +822,19 @@ export default function MonthlyAttendanceView({
               </button>
 
               <button
+                onClick={() => handleSetStatus('holiday')}
+                className="p-3 rounded-2xl bg-pink-50 hover:bg-pink-100 dark:bg-pink-950/50 dark:hover:bg-pink-900/60 text-pink-700 dark:text-pink-300 border border-pink-200 dark:border-pink-800 flex items-center gap-2 transition-all"
+              >
+                <span className="w-3 h-3 rounded-full bg-pink-500"></span>
+                <span>Paid Holiday (PH)</span>
+              </button>
+
+              <button
                 onClick={() => handleSetStatus('update_only')}
-                className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-2 transition-all"
+                className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-2 transition-all col-span-2"
               >
                 <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                <span>Save OT Only</span>
+                <span>Save OT Only (Keep Status)</span>
               </button>
             </div>
 

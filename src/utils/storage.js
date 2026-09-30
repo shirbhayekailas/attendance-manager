@@ -8,6 +8,7 @@ const STORAGE_KEYS = {
   THEME: "staffpulse_theme_v4_clean",
   ADMIN_CREDS: "staffpulse_admin_creds_v4_clean",
   ADVANCES: "staffpulse_advances_v4_clean",
+  EXPENSES: "staffpulse_expenses_v4_clean",
 };
 
 export const defaultCompanyConfig = {
@@ -46,6 +47,7 @@ export function loadStoredData() {
     const rawTheme = localStorage.getItem(STORAGE_KEYS.THEME);
     const rawAdminCreds = localStorage.getItem(STORAGE_KEYS.ADMIN_CREDS);
     const rawAdvances = localStorage.getItem(STORAGE_KEYS.ADVANCES);
+    const rawExpenses = localStorage.getItem(STORAGE_KEYS.EXPENSES);
 
     const parsedConfig = rawConfig ? JSON.parse(rawConfig) : {};
     const finalConfig = {
@@ -61,6 +63,7 @@ export function loadStoredData() {
       attendance: rawAttendance ? JSON.parse(rawAttendance) : {},
       leaves: rawLeaves ? JSON.parse(rawLeaves) : [],
       advances: rawAdvances ? JSON.parse(rawAdvances) : [],
+      expenses: rawExpenses ? JSON.parse(rawExpenses) : [],
       config: finalConfig,
       theme: rawTheme || "dark",
       adminCreds: rawAdminCreds ? JSON.parse(rawAdminCreds) : defaultAdminCreds,
@@ -72,6 +75,7 @@ export function loadStoredData() {
       attendance: {},
       leaves: [],
       advances: [],
+      expenses: [],
       config: defaultCompanyConfig,
       theme: "dark",
       adminCreds: defaultAdminCreds,
@@ -124,6 +128,21 @@ export function getEmployeeTotalAdvance(empId, advances, monthStr) {
   return advances
     .filter(a => a.empId === empId && (!monthStr || !a.month || a.month === monthStr) && a.status !== 'cancelled')
     .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+}
+
+export function saveExpenses(expenses) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.EXPENSES, JSON.stringify(expenses));
+  } catch (err) {
+    console.error("Failed to save site expenses:", err);
+  }
+}
+
+export function getEmployeeTotalExpenses(empId, expenses, monthStr) {
+  if (!expenses || !Array.isArray(expenses)) return 0;
+  return expenses
+    .filter(e => e.empId === empId && (!monthStr || !e.date || e.date.startsWith(monthStr)) && e.status !== 'rejected')
+    .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 }
 
 export function saveConfig(config) {

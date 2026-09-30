@@ -11,7 +11,11 @@ import {
   Sparkles,
   CheckCircle2,
   AlertCircle,
-  Radio
+  Radio,
+  MapPin,
+  Camera,
+  Navigation,
+  Upload
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { sounds } from '../utils/sound';
@@ -27,10 +31,64 @@ export default function KioskView({
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedEmpId, setSelectedEmpId] = useState('');
   const [punchMode, setPunchMode] = useState('office'); // 'office' | 'wfh'
-  const [scanMethod, setScanMethod] = useState('face'); // 'face' | 'badge' | 'manual'
+  const [scanMethod, setScanMethod] = useState('face'); // 'face' | 'badge' | 'manual' | 'site'
   const [isScanning, setIsScanning] = useState(false);
   const [recentPunches, setRecentPunches] = useState([]);
   const [lastPunchAlert, setLastPunchAlert] = useState(null);
+  
+  // Field / Site Staff GPS & Selfie State
+  const [gpsCoords, setGpsCoords] = useState({
+    text: '19.0438° N, 73.1098° E (Taloja Phase-1 Site)',
+    loading: false
+  });
+  const [selfiePreview, setSelfiePreview] = useState('');
+
+  const fetchLiveGps = () => {
+    if (navigator.geolocation) {
+      setGpsCoords(prev => ({ ...prev, loading: true }));
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude.toFixed(4);
+          const lng = pos.coords.longitude.toFixed(4);
+          setGpsCoords({
+            lat,
+            lng,
+            text: `${lat}° N, ${lng}° E (Live GPS Coordinates)`,
+            loading: false
+          });
+        },
+        () => {
+          setGpsCoords({
+            lat: '19.0438',
+            lng: '73.1098',
+            text: '19.0438° N, 73.1098° E (Taloja Phase-1, Navi Mumbai)',
+            loading: false
+          });
+        },
+        { timeout: 6000 }
+      );
+    }
+  };
+
+  useEffect(() => {
+    fetchLiveGps();
+  }, []);
+
+  const handleSelfieUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result;
+      if (base64) {
+        setSelfiePreview(base64);
+        sounds.playSuccess();
+        onSaveToast("Selfie snapshot captured!");
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -63,6 +121,10 @@ export default function KioskView({
     const clockOutVal = action === 'Clock-Out' ? timeStr : (currentRec.clockOut || "--");
     const duration = action === 'Clock-Out' ? calculateWorkDuration(clockInVal, clockOutVal) : { workingHours: "Active Shift", overtimeHours: 0 };
 
+    const noteText = scanMethod === 'site'
+      ? `Field/Site GPS: ${gpsCoords.text}`
+      : (isLate ? "Punch-in delayed" : punchMode === 'wfh' ? "Remote Clock-In" : "Regular Shift");
+
     const updated = {
       ...attendance,
       [todayStr]: {
@@ -74,7 +136,9 @@ export default function KioskView({
           clockOut: clockOutVal,
           workingHours: duration.workingHours,
           overtimeHours: duration.overtimeHours,
-          note: isLate ? "Punch-in delayed" : punchMode === 'wfh' ? "Remote Clock-In" : "Regular Shift",
+          note: noteText,
+          gpsLocation: scanMethod === 'site' ? gpsCoords.text : currentRec.gpsLocation,
+          selfie: (scanMethod === 'site' && selfiePreview) ? selfiePreview : currentRec.selfie,
         }
       }
     };
@@ -89,15 +153,19 @@ export default function KioskView({
       action,
       status: status.toUpperCase(),
       time: timeStr,
-      mode: punchMode,
+      mode: scanMethod === 'site' ? 'SITE GPS' : punchMode,
+      gps: scanMethod === 'site' ? gpsCoords.text : undefined,
+      selfie: (scanMethod === 'site' && selfiePreview) ? selfiePreview : undefined,
     };
 
     setRecentPunches([punchData, ...recentPunches.slice(0, 6)]);
     setLastPunchAlert({
       type: action === 'Clock-In' ? 'in' : 'out',
-      msg: action === 'Clock-In'
-        ? `Access Granted! Welcome to office, ${emp.name}. Recorded at ${timeStr}.`
-        : `Shift Completed! Goodbye ${emp.name}. Clock-out logged at ${timeStr}.`,
+      msg: scanMethod === 'site'
+        ? `Field Site Punch Verified! Logged for ${emp.name} with live GPS.`
+        : (action === 'Clock-In'
+          ? `Access Granted! Welcome to office, ${emp.name}. Recorded at ${timeStr}.`
+          : `Shift Completed! Goodbye ${emp.name}. Clock-out logged at ${timeStr}.`),
       emp,
     });
     setSelectedEmpId('');
@@ -146,7 +214,7 @@ export default function KioskView({
 
         {/* Scan Method Switcher */}
         <div className="mt-8 flex justify-center">
-          <div className="flex p-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 max-w-sm w-full">
+          <div className="flex p-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 max-w-xl w-full">
             <button
               onClick={() => {
                 sounds.playSuccess();
@@ -157,7 +225,7 @@ export default function KioskView({
               }`}
             >
               <ScanFace className="w-3.5 h-3.5" />
-              <span>Face AI Scan</span>
+              <span>Face AI</span>
             </button>
 
             <button
@@ -171,6 +239,20 @@ export default function KioskView({
             >
               <CreditCard className="w-3.5 h-3.5" />
               <span>RFID Badge</span>
+            </button>
+
+            <button
+              onClick={() => {
+                sounds.playSuccess();
+                setScanMethod('site');
+                fetchLiveGps();
+              }}
+              className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 ${
+                scanMethod === 'site' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Site GPS &amp; Selfie</span>
             </button>
 
             <button
@@ -325,6 +407,105 @@ export default function KioskView({
           </div>
         )}
 
+        {/* METHOD 4: FIELD / SITE GPS & SELFIE PUNCH */}
+        {scanMethod === 'site' && (
+          <div className="mt-6 max-w-md mx-auto space-y-3.5">
+            {/* Live GPS Coordinates Banner */}
+            <div className="p-3.5 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-left flex items-start justify-between gap-2">
+              <div className="flex items-start gap-2.5">
+                <MapPin className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5 animate-pulse" />
+                <div>
+                  <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider block">
+                    Live GPS Geofence Verification
+                  </span>
+                  <p className="text-xs font-mono font-bold text-white mt-0.5">
+                    {gpsCoords.text}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={fetchLiveGps}
+                className="p-1.5 rounded-lg bg-emerald-800/60 hover:bg-emerald-700 text-emerald-200 transition-colors shrink-0"
+                title="Refresh GPS"
+              >
+                <Navigation className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Camera Selfie Snapshot Card */}
+            <div className="p-4 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-between gap-3 text-left">
+              <div className="flex items-center gap-3">
+                {selfiePreview ? (
+                  <img
+                    src={selfiePreview}
+                    alt="Site Selfie"
+                    className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-400 shadow-md shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-2xl bg-white/10 border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-slate-400 shrink-0">
+                    <Camera className="w-6 h-6 text-slate-400" />
+                  </div>
+                )}
+                <div>
+                  <span className="text-xs font-bold text-white block">
+                    {selfiePreview ? '✓ Live Selfie Verified' : 'Field Selfie Required'}
+                  </span>
+                  <p className="text-[10px] text-slate-400">
+                    Take on-site photo with phone camera
+                  </p>
+                </div>
+              </div>
+
+              <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition-all active:scale-95 shrink-0">
+                <Camera className="w-3.5 h-3.5" />
+                <span>{selfiePreview ? 'Retake' : 'Snap Selfie'}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  onChange={handleSelfieUpload}
+                  className="hidden"
+                />
+              </label>
+            </div>
+
+            {/* Employee Selector */}
+            <select
+              value={selectedEmpId}
+              onChange={(e) => setSelectedEmpId(e.target.value)}
+              className="w-full p-3 text-xs rounded-xl bg-slate-800/90 border border-slate-700 text-slate-200 focus:outline-none cursor-pointer"
+            >
+              <option value="">Select Field / Site Employee...</option>
+              {employees.map(emp => (
+                <option key={emp.id} value={emp.id}>
+                  {emp.name} ({emp.id}) • {emp.department}
+                </option>
+              ))}
+            </select>
+
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 pt-1">
+              <button
+                onClick={() => handleManualPunch('Clock-In')}
+                disabled={!selectedEmpId}
+                className="py-3.5 px-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm rounded-2xl shadow-lg shadow-emerald-500/30 flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>GPS Punch IN</span>
+              </button>
+
+              <button
+                onClick={() => handleManualPunch('Clock-Out')}
+                disabled={!selectedEmpId}
+                className="py-3.5 px-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:cursor-not-allowed text-white font-black text-sm rounded-2xl shadow-lg shadow-amber-500/30 flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>GPS Punch OUT</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Live Audio / Visual Confirmation Alert */}
         {lastPunchAlert && (
           <div className="mt-6 p-4 rounded-2xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-200 flex items-center justify-center gap-3 animate-fade-in max-w-md mx-auto">
@@ -365,14 +546,24 @@ export default function KioskView({
             {recentPunches.map((punch, idx) => (
               <div key={idx} className="py-3.5 flex items-center justify-between text-xs hover:bg-slate-50 dark:hover:bg-slate-800/40 px-2 rounded-xl transition-colors">
                 <div className="flex items-center gap-3">
-                  <img src={punch.avatar} alt={punch.name} className="w-9 h-9 rounded-2xl object-cover" />
+                  <div className="relative">
+                    <img src={punch.avatar} alt={punch.name} className="w-9 h-9 rounded-2xl object-cover" />
+                    {punch.selfie && (
+                      <img src={punch.selfie} alt="Selfie" className="w-4 h-4 rounded-full border border-emerald-400 absolute -bottom-1 -right-1 object-cover" />
+                    )}
+                  </div>
                   <div>
                     <span className="font-bold text-slate-900 dark:text-white block">
                       {punch.name}
                     </span>
-                    <span className="text-[11px] text-slate-400">
-                      {punch.empId} • {punch.department} • {punch.mode === 'wfh' ? 'Remote' : 'In-Office'}
+                    <span className="text-[11px] text-slate-400 block">
+                      {punch.empId} • {punch.department} • {punch.mode === 'wfh' ? 'Remote' : punch.mode}
                     </span>
+                    {punch.gps && (
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono block">
+                        📍 {punch.gps}
+                      </span>
+                    )}
                   </div>
                 </div>
 

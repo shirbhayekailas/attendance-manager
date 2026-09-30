@@ -77,6 +77,7 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
   let paidLeave = 0;
   let unpaidAbsent = 0;
   let weekOff = 0;
+  let holidays = 0;
   let totalOvertimeHours = 0;
 
   const logs = [];
@@ -107,6 +108,7 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
       else if (status === "leave") paidLeave++;
       else if (status === "absent") unpaidAbsent++;
       else if (status === "week_off" || status === "wo") weekOff++;
+      else if (status === "holiday" || status === "ph") holidays++;
 
       logs.push({
         date,
@@ -120,8 +122,8 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
     }
   });
 
-  // Payable Days = In-Office + WFH + Paid Leaves + Week Offs + 0.5 * HalfDay
-  const payableDays = inOffice + wfh + paidLeave + weekOff + (halfDay * 0.5);
+  // Payable Days = In-Office + WFH + Paid Leaves + Week Offs + Paid Holidays + 0.5 * HalfDay
+  const payableDays = inOffice + wfh + paidLeave + weekOff + holidays + (halfDay * 0.5);
 
   // Overall Attendance Percentage
   const attendanceRate = totalWorkingDays > 0 ? Number(((payableDays / totalWorkingDays) * 100).toFixed(1)) : 0;
@@ -159,6 +161,7 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
     paidLeave,
     unpaidAbsent,
     weekOff,
+    holidays,
     totalOvertimeHours: Number(totalOvertimeHours.toFixed(1)),
     payableDays,
     attendanceRate,
@@ -184,6 +187,7 @@ export function getCompanyDailyOverview(dateStr, employees = [], attendanceData 
   let onLeave = 0;
   let absent = 0;
   let weekOff = 0;
+  let holidays = 0;
   let unmarked = 0;
 
   safeEmployees.forEach((emp) => {
@@ -201,6 +205,7 @@ export function getCompanyDailyOverview(dateStr, employees = [], attendanceData 
       else if (rec.status === "leave") onLeave++;
       else if (rec.status === "absent") absent++;
       else if (rec.status === "week_off" || rec.status === "wo") weekOff++;
+      else if (rec.status === "holiday" || rec.status === "ph") holidays++;
     }
   });
 
@@ -220,6 +225,7 @@ export function getCompanyDailyOverview(dateStr, employees = [], attendanceData 
     onLeave,
     absent,
     weekOff,
+    holidays,
     unmarked,
     presentTotal,
     attendancePercentage,

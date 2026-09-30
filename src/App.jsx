@@ -33,6 +33,7 @@ import {
   saveTheme, 
   saveAdminCreds,
   saveAdvances,
+  saveExpenses,
   defaultAdminCreds,
   wipeAllStoredData,
   defaultCompanyConfig 
@@ -54,6 +55,7 @@ export default function App() {
   const [attendance, setAttendance] = useState(() => stored.attendance || {});
   const [leaves, setLeaves] = useState(() => stored.leaves || []);
   const [advances, setAdvances] = useState(() => stored.advances || []);
+  const [expenses, setExpenses] = useState(() => stored.expenses || []);
   const [adminCreds, setAdminCreds] = useState(() => stored.adminCreds || defaultAdminCreds);
 
   const [config, setConfig] = useState(() => stored.config || defaultCompanyConfig);
@@ -109,6 +111,7 @@ export default function App() {
         if (data.attendance) setAttendance(data.attendance);
         if (data.leaves) setLeaves(data.leaves);
         if (data.advances) setAdvances(data.advances);
+        if (data.expenses) setExpenses(data.expenses);
         if (data.config) setConfig(prev => ({ ...prev, ...data.config }));
         if (data.adminCreds) setAdminCreds(data.adminCreds);
         setSyncStatus('synced');
@@ -188,6 +191,14 @@ export default function App() {
     }
   }, [advances]);
 
+  useEffect(() => {
+    saveExpenses(expenses);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ expenses }).then(() => setSyncStatus('synced'));
+    }
+  }, [expenses]);
+
   const triggerToast = (msg) => {
     setToastMessage(msg);
   };
@@ -199,6 +210,7 @@ export default function App() {
     setAttendance({});
     setLeaves([]);
     setAdvances([]);
+    setExpenses([]);
     setAdminCreds(defaultAdminCreds);
     await wipeCleanOnServer();
     sounds.playSuccess();
@@ -280,6 +292,7 @@ export default function App() {
               leaves={leaves}
               setLeaves={setLeaves}
               advances={advances}
+              expenses={expenses}
               config={config}
               onSaveToast={triggerToast}
             />
@@ -387,6 +400,8 @@ export default function App() {
               attendance={attendance}
               advances={advances}
               setAdvances={setAdvances}
+              expenses={expenses}
+              setExpenses={setExpenses}
               config={config}
               setConfig={setConfig}
               onSelectEmployee={setSelectedEmployee}
@@ -410,6 +425,8 @@ export default function App() {
               attendance={attendance}
               advances={advances}
               setAdvances={setAdvances}
+              expenses={expenses}
+              setExpenses={setExpenses}
               config={config}
               onSaveToast={triggerToast}
             />
@@ -459,6 +476,7 @@ export default function App() {
             attendance={attendance}
             advances={advances}
             setAdvances={setAdvances}
+            expenses={expenses}
             config={config}
             onClose={() => setSelectedEmployee(null)}
           />

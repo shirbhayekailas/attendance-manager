@@ -20,11 +20,14 @@ import {
   CalendarDays,
   Printer,
   Plus,
-  Minus
+  Minus,
+  MessageCircle,
+  UploadCloud
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
 import { sounds } from '../utils/sound';
+import BiometricImportModal from './BiometricImportModal';
 
 export default function MarkAttendanceView({ 
   employees, 
@@ -41,6 +44,7 @@ export default function MarkAttendanceView({
   const [selectedShift, setSelectedShift] = useState('All');
   const [selectedIds, setSelectedIds] = useState([]); // Array of emp IDs for bulk actions
   const [activeNoteModal, setActiveNoteModal] = useState(null);
+  const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
 
   const departments = ['All', ...new Set([
     ...(config?.departments || []),
@@ -104,6 +108,11 @@ export default function MarkAttendanceView({
         clockOut = "--";
         workingHours = "0h 00m";
         note = "Unapproved Absence (LWP)";
+      } else if (status === 'holiday') {
+        clockIn = "--";
+        clockOut = "--";
+        workingHours = "8h 00m";
+        note = "Paid Public/Festival Holiday (PH)";
       }
 
       updatedDay[id] = {
@@ -118,7 +127,7 @@ export default function MarkAttendanceView({
 
     setAttendance({ ...attendance, [selectedDate]: updatedDay });
     sounds.playSuccess();
-    onSaveToast(`Updated ${targetIds.length} staff members to ${status === 'week_off' ? 'WEEK OFF' : status.toUpperCase()}!`);
+    onSaveToast(`Updated ${targetIds.length} staff members to ${status === 'week_off' ? 'WEEK OFF' : status === 'holiday' ? 'PAID HOLIDAY (PH)' : status.toUpperCase()}!`);
     setSelectedIds([]);
   };
 
@@ -136,6 +145,11 @@ export default function MarkAttendanceView({
       clockOut = "--";
       workingHours = "0h 00m";
       note = note || "Scheduled Week Off (WO)";
+    } else if (status === 'holiday') {
+      clockIn = "--";
+      clockOut = "--";
+      workingHours = "8h 00m";
+      note = note || "Paid Public/Festival Holiday (PH)";
     } else if (status === 'leave') {
       clockIn = "--";
       clockOut = "--";
@@ -271,6 +285,7 @@ export default function MarkAttendanceView({
   let onLeave = 0;
   let absent = 0;
   let weekOff = 0;
+  let holiday = 0;
   let markedCount = 0;
 
   filteredEmployees.forEach((emp) => {
@@ -283,12 +298,47 @@ export default function MarkAttendanceView({
       else if (rec.status === 'leave') onLeave++;
       else if (rec.status === 'absent') absent++;
       else if (rec.status === 'week_off' || rec.status === 'wo') weekOff++;
+      else if (rec.status === 'holiday' || rec.status === 'ph') holiday++;
     }
   });
 
   const dayPercentage = markedCount > 0
-    ? Number(((inOffice + wfh + weekOff + (halfDay * 0.5)) / markedCount * 100).toFixed(1))
+    ? Number(((inOffice + wfh + weekOff + holiday + (halfDay * 0.5)) / markedCount * 100).toFixed(1))
     : 0;
+
+  // WhatsApp Daily Summary Report Send
+  const handleShareDailyWhatsApp = () => {
+    sounds.playSuccess();
+    const dateFormatted = new Date(selectedDate).toLocaleDateString('en-IN', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    });
+
+    const totalStaff = employees.length;
+    const totalOvertime = Object.values(dayRecords).reduce((acc, curr) => acc + (Number(curr.overtimeHours) || 0), 0);
+
+    const msg = `*DAILY ATTENDANCE SUMMARY - ${dateFormatted.toUpperCase()}*
+*SK ENTERPRISES*
+303, Panchsheel CHS Ltd, Plot No 07, Sec -02, Taloja Phase -01, Navi Mumbai - 410208
+
+*Workforce Attendance Summary:*
+- Total Headcount: ${totalStaff} Staff
+- Present in Office: ${inOffice}
+- Work From Home (WFH): ${wfh}
+- Week Off (WO): ${weekOff}${holiday > 0 ? `\n- Paid Public Holiday (PH): ${holiday}` : ''}
+- Half Days: ${halfDay}
+- Approved Leaves: ${onLeave}
+- Absent (LWP): ${absent}
+- Shift Compliance: ${dayPercentage}%
+- Overtime Logged Today: ${totalOvertime} Hours
+
+_Automated summary report from SK ENTERPRISES StaffPulse._`;
+
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
 
   return (
     <div className="space-y-6">
@@ -366,8 +416,26 @@ export default function MarkAttendanceView({
           )}
         </div>
 
-        {/* Bulk Action Buttons & Print */}
+        {/* Bulk Action Buttons, Import & WhatsApp */}
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          <button
+            onClick={handleShareDailyWhatsApp}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/25 transition-all active:scale-95"
+            title="Share Today's Complete Attendance Summary on WhatsApp"
+          >
+            <MessageCircle className="w-3.5 h-3.5" />
+            <span>WhatsApp Report</span>
+          </button>
+
+          <button
+            onClick={() => setIsBiometricModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200/70 dark:border-purple-800/60 transition-all active:scale-95 shadow-xs"
+            title="Upload CSV / Excel Biometric Machine Logs"
+          >
+            <UploadCloud className="w-3.5 h-3.5" />
+            <span>Import Biometric / Excel</span>
+          </button>
+
           <button
             onClick={() => {
               sounds.playSuccess();
@@ -377,12 +445,12 @@ export default function MarkAttendanceView({
             title="Print Daily Sheet"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print Daily Sheet</span>
+            <span>Print Sheet</span>
           </button>
 
           <button
             onClick={() => handleBulkStatusSelected('present')}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/60 transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/70 dark:border-emerald-800/60 transition-all active:scale-95"
           >
             <Building className="w-3.5 h-3.5" />
             <span>Mark {selectedIds.length > 0 ? `(${selectedIds.length})` : 'All'} Office</span>
@@ -390,7 +458,7 @@ export default function MarkAttendanceView({
 
           <button
             onClick={() => handleBulkStatusSelected('wfh')}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/60 transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:hover:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/70 dark:border-indigo-800/60 transition-all active:scale-95"
           >
             <Home className="w-3.5 h-3.5" />
             <span>Mark {selectedIds.length > 0 ? `(${selectedIds.length})` : 'All'} WFH</span>
@@ -398,11 +466,20 @@ export default function MarkAttendanceView({
 
           <button
             onClick={() => handleBulkStatusSelected('week_off')}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/70 dark:border-sky-800/60 transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200/70 dark:border-sky-800/60 transition-all active:scale-95"
             title="Mark Selected or All Staff as Week Off"
           >
             <CalendarDays className="w-3.5 h-3.5" />
-            <span>Mark {selectedIds.length > 0 ? `(${selectedIds.length})` : 'All'} Week Off</span>
+            <span>Mark {selectedIds.length > 0 ? `(${selectedIds.length})` : 'All'} WO</span>
+          </button>
+
+          <button
+            onClick={() => handleBulkStatusSelected('holiday')}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-pink-50 hover:bg-pink-100 dark:bg-pink-950/60 dark:hover:bg-pink-900/60 text-pink-700 dark:text-pink-300 border border-pink-200/70 dark:border-pink-800/60 transition-all active:scale-95"
+            title="Mark Selected or All Staff as Paid Public Holiday (PH)"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Mark {selectedIds.length > 0 ? `(${selectedIds.length})` : 'All'} Holiday</span>
           </button>
 
           <button
@@ -1087,6 +1164,18 @@ export default function MarkAttendanceView({
             </form>
           </div>
         </div>
+      )}
+
+      {/* Biometric CSV / Excel Punch Import Modal */}
+      {isBiometricModalOpen && (
+        <BiometricImportModal
+          isOpen={isBiometricModalOpen}
+          onClose={() => setIsBiometricModalOpen(false)}
+          employees={employees}
+          attendance={attendance}
+          setAttendance={setAttendance}
+          onSaveToast={onSaveToast}
+        />
       )}
 
     </div>

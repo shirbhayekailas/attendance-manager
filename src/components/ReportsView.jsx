@@ -12,19 +12,26 @@ import {
   Eye,
   X,
   DollarSign,
-  IndianRupee
+  IndianRupee,
+  MessageCircle,
+  FileText,
+  Wallet
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
-import { getEmployeeTotalAdvance } from '../utils/storage';
+import { getEmployeeTotalAdvance, getEmployeeTotalExpenses } from '../utils/storage';
 import { sounds } from '../utils/sound';
 import SalarySlipModal from './SalarySlipModal';
 import SalaryAdvanceModal from './SalaryAdvanceModal';
+import BatchSalarySlipsModal from './BatchSalarySlipsModal';
+import SiteExpenseModal from './SiteExpenseModal';
 
 export default function ReportsView({ 
   employees, 
   attendance, 
   advances = [],
   setAdvances,
+  expenses = [],
+  setExpenses,
   config, 
   onSaveToast 
 }) {
@@ -34,6 +41,9 @@ export default function ReportsView({
   const [selectedPayslipEmp, setSelectedPayslipEmp] = useState(null);
   const [advanceTargetEmp, setAdvanceTargetEmp] = useState(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
+  const [isBatchSlipsOpen, setIsBatchSlipsOpen] = useState(false);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [expenseTargetEmp, setExpenseTargetEmp] = useState(null);
 
   const allDates = Object.keys(attendance).sort();
   const filteredDates = rangeFilter === 'all' 
@@ -49,6 +59,7 @@ export default function ReportsView({
     let rangeLeave = 0;
     let rangeAbsent = 0;
     let rangeWeekOff = 0;
+    let rangeHoliday = 0;
     let rangeLate = 0;
     let rangeOvertime = 0;
 
@@ -73,13 +84,15 @@ export default function ReportsView({
         else if (rec.status === 'leave') rangeLeave++;
         else if (rec.status === 'absent') rangeAbsent++;
         else if (rec.status === 'week_off' || rec.status === 'wo') rangeWeekOff++;
+        else if (rec.status === 'holiday' || rec.status === 'ph') rangeHoliday++;
       }
     });
 
-    const payableDays = rangeOffice + rangeWFH + rangeLeave + rangeWeekOff + (rangeHalfDay * 0.5);
+    const payableDays = rangeOffice + rangeWFH + rangeLeave + rangeWeekOff + rangeHoliday + (rangeHalfDay * 0.5);
     const overallStats = calculateEmployeeStats(emp.id, attendance, emp.salaryMonthly || 100000, 22);
     const advanceAmount = getEmployeeTotalAdvance(emp.id, advances);
-    const netDisbursal = Math.max(0, overallStats.netEstimatedSalary - advanceAmount);
+    const siteAllowance = getEmployeeTotalExpenses(emp.id, expenses, '2026-09');
+    const netDisbursal = Math.max(0, overallStats.netEstimatedSalary + siteAllowance - advanceAmount);
 
     return {
       ...emp,
@@ -90,10 +103,12 @@ export default function ReportsView({
       rangeLeave,
       rangeAbsent,
       rangeWeekOff,
+      rangeHoliday,
       rangeLate,
       rangeOvertime: Number(rangeOvertime.toFixed(1)),
       payableDays,
       advanceAmount,
+      siteAllowance,
       netDisbursal,
       overallStats,
     };
@@ -168,6 +183,75 @@ export default function ReportsView({
     onSaveToast("Downloaded Corporate Payroll CSV!");
   };
 
+  // Bank Salary Transfer File Export (NEFT / RTGS Corporate Payment)
+  const handleExportBankTransferCSV = () => {
+    sounds.playSuccess();
+    const headers = [
+      'Beneficiary Name',
+      'Bank Account Number',
+      'IFSC Code',
+      'Amount (INR)',
+      'Payment Mode',
+      'Narration / Remarks',
+      'Employee Code',
+      'Bank Name'
+    ];
+
+    const rows = displayedEmployees.map(e => [
+      `"${e.name}"`,
+      `"${e.bankAccountNo || '••••••••' + (e.id.replace(/\D/g, '') || '4892')}"`,
+      `"${e.ifscCode || 'HDFC0000123'}"`,
+      e.netDisbursal,
+      'NEFT',
+      `"SALARY SEP 2026 - SK ENTERPRISES"`,
+      `"${e.id}"`,
+      `"${e.bankName || 'HDFC Bank Ltd'}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `bank_salary_neft_rtgs_transfer_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    onSaveToast("Exported Bank Salary Transfer File (NEFT / RTGS)!");
+  };
+
+  // Quick 1-Click WhatsApp Salary Slip Notification
+  const handleShareWhatsAppSlip = (emp) => {
+    sounds.playSuccess();
+    const phone = (emp.phone || '').replace(/[^0-9]/g, '');
+    const cleanPhone = phone.length === 10 ? `91${phone}` : phone;
+    const siteAllow = emp.siteAllowance || 0;
+    const msg = `*SALARY SLIP - SEPTEMBER 2026*
+*SK ENTERPRISES*
+303, Panchsheel CHS Ltd, Plot No 07, Sec -02, Taloja Phase -01, Navi Mumbai - 410208
+
+Employee: *${emp.name}* (${emp.id})
+Designation: ${emp.role} | Dept: ${emp.department}
+
+*Attendance Summary:*
+- Present / WFH: ${emp.rangeOffice + emp.rangeWFH} Days
+- Week Off (WO): ${emp.rangeWeekOff} Days
+- Paid Leave / Holiday: ${emp.rangeLeave + emp.rangeHoliday} Days
+- Overtime Logged: ${emp.rangeOvertime} hrs
+- Total Payable Days: ${emp.payableDays} / ${emp.rangeTotal}
+
+*Salary Calculation:*
+- Basic Salary: ₹${(emp.salaryMonthly || 0).toLocaleString('en-IN')}
+- Overtime Pay: ₹${(emp.overallStats?.overtimePay || 0).toLocaleString('en-IN')}${siteAllow > 0 ? `\n- Site Allowance / Batta: ₹${siteAllow.toLocaleString('en-IN')}` : ''}
+${emp.advanceAmount > 0 ? `- Advance Deducted: ₹${emp.advanceAmount.toLocaleString('en-IN')}\n` : ''}*Net Payable Salary: ₹${(emp.netDisbursal || 0).toLocaleString('en-IN')}*
+
+_This is a computer-generated salary slip from SK ENTERPRISES._`;
+
+    const url = cleanPhone 
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
   const handlePrint = () => {
     sounds.playSuccess();
     window.print();
@@ -226,6 +310,36 @@ export default function ReportsView({
           </div>
 
           <button
+            onClick={handleExportBankTransferCSV}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/80 transition-colors shadow-xs"
+            title="Download Bank Salary Transfer NEFT/RTGS Excel/CSV"
+          >
+            <Building className="w-3.5 h-3.5" />
+            <span>Bank NEFT File</span>
+          </button>
+
+          <button
+            onClick={() => setIsBatchSlipsOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800/80 transition-colors shadow-xs"
+            title="Print or Save All Employee Payslips in One PDF Job"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print All Slips (Batch)</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setExpenseTargetEmp(null);
+              setIsExpenseModalOpen(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 transition-colors shadow-xs"
+            title="Record Site Travel, Food & Daily Kharcha"
+          >
+            <Wallet className="w-3.5 h-3.5" />
+            <span>Site Kharcha</span>
+          </button>
+
+          <button
             onClick={handleExportPayrollCSV}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 transition-colors"
           >
@@ -238,7 +352,7 @@ export default function ReportsView({
             className="flex items-center gap-1.5 px-4 py-2 text-xs font-black rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/30 transition-all active:scale-95"
           >
             <Printer className="w-3.5 h-3.5" />
-            <span>Print Register / PDF</span>
+            <span>Print Register</span>
           </button>
         </div>
       </div>
@@ -372,9 +486,10 @@ export default function ReportsView({
                   <th className="py-3.5 px-4 text-center">OT Hours</th>
                   <th className="py-3.5 px-4 text-center font-black text-emerald-600 dark:text-emerald-400">Payable Days</th>
                   <th className="py-3.5 px-4 text-right">Basic Salary</th>
-                  <th className="py-3.5 px-4 text-right font-black text-amber-600 dark:text-amber-400">Advance</th>
+                  <th className="py-3.5 px-4 text-right font-black text-amber-600 dark:text-amber-400">Site Batta</th>
+                  <th className="py-3.5 px-4 text-right font-black text-rose-600 dark:text-rose-400">Advance</th>
                   <th className="py-3.5 px-4 text-right font-black text-emerald-600 dark:text-emerald-400">Net Salary</th>
-                  <th className="no-print py-3.5 px-4 text-center">Slip</th>
+                  <th className="no-print py-3.5 px-4 text-center">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -412,7 +527,7 @@ export default function ReportsView({
                     </td>
 
                     <td className="py-3 px-4 text-center font-bold text-purple-500">
-                      {emp.rangeLeave}d
+                      {emp.rangeLeave + emp.rangeHoliday}d
                     </td>
 
                     <td className="py-3 px-4 text-center font-bold text-rose-500">
@@ -434,13 +549,39 @@ export default function ReportsView({
                     </td>
 
                     <td className="py-3 px-4 text-right">
+                      {emp.siteAllowance > 0 ? (
+                        <button
+                          onClick={() => {
+                            setExpenseTargetEmp(emp);
+                            setIsExpenseModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 hover:ring-2 hover:ring-amber-500/50 transition-all cursor-pointer"
+                          title="Click to view/manage site allowance"
+                        >
+                          +₹{emp.siteAllowance.toLocaleString('en-IN')}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setExpenseTargetEmp(emp);
+                            setIsExpenseModalOpen(true);
+                          }}
+                          className="no-print text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 text-xs font-medium px-2 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          title="Record site kharcha / batta for this employee"
+                        >
+                          + ₹0
+                        </button>
+                      )}
+                    </td>
+
+                    <td className="py-3 px-4 text-right">
                       {emp.advanceAmount > 0 ? (
                         <button
                           onClick={() => {
                             setAdvanceTargetEmp(emp);
                             setIsAdvanceModalOpen(true);
                           }}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 hover:ring-2 hover:ring-amber-500/50 transition-all cursor-pointer"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 hover:ring-2 hover:ring-rose-500/50 transition-all cursor-pointer"
                           title="Click to view/manage advance"
                         >
                           -₹{emp.advanceAmount.toLocaleString('en-IN')}
@@ -451,10 +592,10 @@ export default function ReportsView({
                             setAdvanceTargetEmp(emp);
                             setIsAdvanceModalOpen(true);
                           }}
-                          className="no-print text-slate-400 hover:text-amber-600 dark:hover:text-amber-400 text-xs font-medium px-2 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                          className="no-print text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 text-xs font-medium px-2 py-0.5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                           title="Record advance for this employee"
                         >
-                          + ₹0
+                          - ₹0
                         </button>
                       )}
                     </td>
@@ -464,13 +605,22 @@ export default function ReportsView({
                     </td>
 
                     <td className="no-print py-3 px-4 text-center">
-                      <button
-                        onClick={() => setSelectedPayslipEmp(emp)}
-                        className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
-                        title="View Detailed Payslip"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => handleShareWhatsAppSlip(emp)}
+                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors"
+                          title="Send Salary Slip via WhatsApp"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setSelectedPayslipEmp(emp)}
+                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+                          title="View Detailed Payslip"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -533,6 +683,10 @@ export default function ReportsView({
                             <span className="w-6 h-6 rounded-md inline-flex items-center justify-center font-black text-[9px] bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300">
                               WO
                             </span>
+                          ) : (status === 'holiday' || status === 'ph') ? (
+                            <span className="w-6 h-6 rounded-md inline-flex items-center justify-center font-black text-[9px] bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                              PH
+                            </span>
                           ) : status === 'absent' ? (
                             <span className="w-6 h-6 rounded-md inline-flex items-center justify-center font-black text-[10px] bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
                               A
@@ -576,6 +730,7 @@ export default function ReportsView({
           employee={selectedPayslipEmp}
           attendance={attendance}
           advances={advances}
+          expenses={expenses}
           config={config}
           monthYear="September 2026"
           onClose={() => setSelectedPayslipEmp(null)}
@@ -594,6 +749,36 @@ export default function ReportsView({
           initialEmployee={advanceTargetEmp}
           advances={advances}
           setAdvances={setAdvances}
+          onSaveToast={onSaveToast}
+        />
+      )}
+
+      {/* Batch All Payslips Print / PDF Modal */}
+      {isBatchSlipsOpen && (
+        <BatchSalarySlipsModal
+          isOpen={isBatchSlipsOpen}
+          onClose={() => setIsBatchSlipsOpen(false)}
+          employees={displayedEmployees}
+          attendance={attendance}
+          advances={advances}
+          expenses={expenses}
+          config={config}
+          monthYear="September 2026"
+        />
+      )}
+
+      {/* Site Kharcha & Daily Allowance Modal */}
+      {isExpenseModalOpen && (
+        <SiteExpenseModal
+          isOpen={isExpenseModalOpen}
+          onClose={() => {
+            setIsExpenseModalOpen(false);
+            setExpenseTargetEmp(null);
+          }}
+          employees={employees}
+          initialEmployee={expenseTargetEmp}
+          expenses={expenses}
+          setExpenses={setExpenses}
           onSaveToast={onSaveToast}
         />
       )}

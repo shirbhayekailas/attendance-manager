@@ -226,6 +226,7 @@ export async function initDatabase() {
             createdAt: new Date().toISOString(),
           }
         ],
+        expenses: [],
         config: defaultCompanyConfig,
         adminCreds: defaultAdminCreds,
         audit: [
@@ -249,6 +250,7 @@ export async function initDatabase() {
       attendance: {},
       leaves: [],
       advances: [],
+      expenses: [],
       config: defaultCompanyConfig,
       adminCreds: defaultAdminCreds,
       audit: [],

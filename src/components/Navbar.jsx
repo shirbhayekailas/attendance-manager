@@ -125,20 +125,20 @@ export default function Navbar({
           {/* Right Action Controls */}
           <div className="flex items-center gap-2 sm:gap-3 ml-auto">
             
-            {/* Live Cloud Database Sync Status */}
+            {/* Live Cloud Database Sync & Server Keep-Alive Status */}
             <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
               syncStatus === 'synced'
                 ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
                 : syncStatus === 'syncing'
                 ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800/60'
                 : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
-            }`} title="Multi-device database status on Render server">
+            }`} title={syncStatus === 'synced' ? "Render Server Active • 13-min Auto Keep-Alive Enabled" : syncStatus === 'syncing' ? "Waking Up Render Free-Tier Server..." : "Using Local Offline Storage"}>
               <span className={`w-2 h-2 rounded-full ${
                 syncStatus === 'synced' ? 'bg-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-700' :
                 syncStatus === 'syncing' ? 'bg-blue-500 animate-spin' :
                 'bg-amber-500'
               }`}></span>
-              <span>{syncStatus === 'synced' ? 'Cloud Synced' : syncStatus === 'syncing' ? 'Syncing...' : 'Local Cache'}</span>
+              <span>{syncStatus === 'synced' ? 'Cloud Synced (Keep-Alive)' : syncStatus === 'syncing' ? 'Waking Server...' : 'Local Cache'}</span>
             </div>
 
             {/* Live Clock & Shift Badge */}

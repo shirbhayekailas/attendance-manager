@@ -25,11 +25,13 @@ import {
   Upload,
   Camera,
   Image as ImageIcon,
-  IndianRupee
+  IndianRupee,
+  Wallet
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateStatutoryComponents } from '../utils/attendanceCalculations';
 import { getEmployeeTotalAdvance } from '../utils/storage';
 import SalaryAdvanceModal from './SalaryAdvanceModal';
+import SiteExpenseModal from './SiteExpenseModal';
 
 export default function MembersView({ 
   employees, 
@@ -37,6 +39,8 @@ export default function MembersView({
   attendance, 
   advances = [],
   setAdvances,
+  expenses = [],
+  setExpenses,
   config = {}, 
   setConfig,
   onSelectEmployee, 
@@ -48,6 +52,8 @@ export default function MembersView({
   const [editingEmployee, setEditingEmployee] = useState(null); // 'new' | employee object
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [advanceTargetEmployee, setAdvanceTargetEmployee] = useState(null);
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+  const [expenseTargetEmployee, setExpenseTargetEmployee] = useState(null);
   const [isCustomDept, setIsCustomDept] = useState(false);
   const [customDeptInput, setCustomDeptInput] = useState('');
   const [formData, setFormData] = useState({
@@ -67,6 +73,9 @@ export default function MembersView({
     statutoryType: 'pf_esic', // 'pf_esic' | 'non_pf_esic'
     uanNo: '',
     esicNo: '',
+    bankName: 'HDFC Bank Ltd',
+    bankAccountNo: '',
+    ifscCode: '',
   });
 
   // Dynamically merge config departments with existing employee departments
@@ -152,6 +161,9 @@ export default function MembersView({
       statutoryType: emp.statutoryType || 'pf_esic',
       uanNo: emp.uanNo || '',
       esicNo: emp.esicNo || '',
+      bankName: emp.bankName || 'HDFC Bank Ltd',
+      bankAccountNo: emp.bankAccountNo || '',
+      ifscCode: emp.ifscCode || '',
     });
     setEditingEmployee(emp);
   };
@@ -216,6 +228,9 @@ export default function MembersView({
       statutoryType: formData.statutoryType || 'pf_esic',
       uanNo: formData.uanNo || '',
       esicNo: formData.esicNo || '',
+      bankName: formData.bankName || 'HDFC Bank Ltd',
+      bankAccountNo: formData.bankAccountNo || '',
+      ifscCode: formData.ifscCode || '',
       avatar: finalAvatar,
     };
 
@@ -520,12 +535,18 @@ export default function MembersView({
                       <span>Shift: {emp.shift}</span>
                     </div>
                   )}
+                  {emp.bankAccountNo && (
+                    <div className="flex items-center gap-2 text-[11px] font-mono text-slate-500 dark:text-slate-400">
+                      <CreditCard className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>{emp.bankName || 'Bank'}: •••• {emp.bankAccountNo.slice(-4)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Actions Bar */}
               <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     onClick={() => onSelectEmployee(emp)}
                     className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 rounded-xl transition-colors"
@@ -538,11 +559,22 @@ export default function MembersView({
                       setAdvanceTargetEmployee(emp);
                       setIsAdvanceModalOpen(true);
                     }}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-amber-700 dark:text-amber-300 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 rounded-xl transition-colors"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/60 dark:hover:bg-rose-900/60 rounded-xl transition-colors"
                     title={`Record Advance for ${emp.name}`}
                   >
                     <IndianRupee className="w-3.5 h-3.5" />
                     <span>Advance</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setExpenseTargetEmployee(emp);
+                      setIsExpenseModalOpen(true);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/60 dark:hover:bg-amber-900/60 rounded-xl transition-colors"
+                    title={`Record Site Kharcha / Batta for ${emp.name}`}
+                  >
+                    <Wallet className="w-3.5 h-3.5" />
+                    <span>Kharcha</span>
                   </button>
                 </div>
 
@@ -1067,6 +1099,62 @@ export default function MembersView({
 
                   </div>
 
+                  {/* Card 5: Bank Salary Transfer Credentials (NEFT / RTGS) */}
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wide">
+                          5. Bank Transfer Credentials
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-semibold">
+                        NEFT / RTGS Payment File
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Bank Name
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.bankName || ''}
+                          onChange={(e) => setFormData({ ...formData, bankName: e.target.value })}
+                          placeholder="e.g. HDFC Bank Ltd"
+                          className="w-full p-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-medium"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          Account Number
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.bankAccountNo || ''}
+                          onChange={(e) => setFormData({ ...formData, bankAccountNo: e.target.value })}
+                          placeholder="e.g. 5010029482910"
+                          className="w-full p-2.5 text-xs font-mono rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
+                          IFSC Code
+                        </label>
+                        <input
+                          type="text"
+                          value={formData.ifscCode || ''}
+                          onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })}
+                          placeholder="e.g. HDFC0000284"
+                          className="w-full p-2.5 text-xs font-mono rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-bold uppercase"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
 
               </div>
@@ -1119,6 +1207,22 @@ export default function MembersView({
           initialEmployee={advanceTargetEmployee}
           advances={advances}
           setAdvances={setAdvances}
+          onSaveToast={onSaveToast}
+        />
+      )}
+
+      {/* Employee Site Kharcha & Daily Allowance Modal */}
+      {isExpenseModalOpen && (
+        <SiteExpenseModal
+          isOpen={isExpenseModalOpen}
+          onClose={() => {
+            setIsExpenseModalOpen(false);
+            setExpenseTargetEmployee(null);
+          }}
+          employees={employees}
+          initialEmployee={expenseTargetEmployee}
+          expenses={expenses}
+          setExpenses={setExpenses}
           onSaveToast={onSaveToast}
         />
       )}

@@ -102,6 +102,35 @@ export async function wipeCleanOnServer() {
   }
 }
 
+// -------------------------------------------------------------
+// SMART SERVER WAKE-UP (Render Cold-Start detection & handler)
+// -------------------------------------------------------------
+export async function wakeUpServer(onProgress) {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s max for cold start
+    const startTime = Date.now();
+
+    if (onProgress) onProgress('waking');
+    const res = await fetch(`${API_BASE}/api/health`, {
+      signal: controller.signal,
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      if (onProgress) onProgress('awake', elapsed);
+      return { awake: true, elapsed, data };
+    }
+    return { awake: false };
+  } catch (err) {
+    if (onProgress) onProgress('offline');
+    return { awake: false, error: err.message };
+  }
+}
+
 export function getLastServerTimestamp() {
   return lastServerTimestamp;
 }

@@ -52,6 +52,7 @@ app.get('/api/sync', (req, res) => {
       attendance: db.attendance || {},
       leaves: db.leaves || [],
       advances: db.advances || [],
+      expenses: db.expenses || [],
       config: db.config || {},
       adminCreds: db.adminCreds || {},
       lastUpdated: db.lastUpdated || new Date().toISOString(),
@@ -64,7 +65,7 @@ app.get('/api/sync', (req, res) => {
 // 3. Instant Push / Delta Sync Endpoint
 app.post('/api/sync', async (req, res) => {
   try {
-    const { employees, attendance, leaves, advances, config, adminCreds } = req.body;
+    const { employees, attendance, leaves, advances, expenses, config, adminCreds } = req.body;
     
     const updated = await updateDatabase((current) => ({
       ...current,
@@ -72,6 +73,7 @@ app.post('/api/sync', async (req, res) => {
       attendance: attendance !== undefined ? attendance : current.attendance,
       leaves: leaves !== undefined ? leaves : current.leaves,
       advances: advances !== undefined ? advances : current.advances,
+      expenses: expenses !== undefined ? expenses : (current.expenses || []),
       config: config !== undefined ? config : current.config,
       adminCreds: adminCreds !== undefined ? adminCreds : current.adminCreds,
     }));
@@ -239,6 +241,41 @@ app.delete('/api/advances/:id', async (req, res) => {
   }
 });
 
+// 7b. Site Expenses & Allowances (Kharcha / Batta / Travel)
+app.get('/api/expenses', (req, res) => {
+  const db = getDatabase();
+  res.json(db.expenses || []);
+});
+
+app.post('/api/expenses', async (req, res) => {
+  try {
+    const expense = req.body;
+    if (!expense.id) {
+      expense.id = `EXP-${Date.now()}`;
+    }
+    const updated = await updateDatabase((current) => ({
+      ...current,
+      expenses: [expense, ...(current.expenses || [])],
+    }));
+    res.json({ success: true, expenses: updated.expenses, lastUpdated: updated.lastUpdated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/expenses/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updated = await updateDatabase((current) => ({
+      ...current,
+      expenses: (current.expenses || []).filter(e => e.id !== id),
+    }));
+    res.json({ success: true, expenses: updated.expenses, lastUpdated: updated.lastUpdated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // 8. Company Configuration & Admin Creds
 app.get('/api/config', (req, res) => {
   const db = getDatabase();
@@ -317,4 +354,20 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📡 Multi-Device Sync Active`);
   console.log(`🌐 URL: http://localhost:${PORT}`);
   console.log(`===============================================`);
+
+  // -------------------------------------------------------------
+  // RENDER FREE TIER KEEP-ALIVE (Prevents service from sleeping)
+  // -------------------------------------------------------------
+  const RENDER_SERVICE_URL = process.env.RENDER_EXTERNAL_URL || 'https://attendance-manager-pro-02o2.onrender.com';
+  setInterval(async () => {
+    try {
+      const healthUrl = `${RENDER_SERVICE_URL}/api/health`;
+      const res = await fetch(healthUrl);
+      if (res.ok) {
+        console.log(`[Keep-Alive] Pinged ${healthUrl} successfully at ${new Date().toISOString()}`);
+      }
+    } catch (err) {
+      // Silent catch
+    }
+  }, 13 * 60 * 1000); // Self-ping every 13 mins (Render idle cutoff is 15 mins)
 });

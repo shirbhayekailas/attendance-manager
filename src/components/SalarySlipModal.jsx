@@ -4,17 +4,20 @@ import {
   Printer, 
   ShieldCheck, 
   FileText,
-  CheckCircle2
+  CheckCircle2,
+  MessageCircle,
+  Share2
 } from 'lucide-react';
 import { calculateEmployeeStats } from '../utils/attendanceCalculations';
 import { numberToIndianCurrencyWords } from '../utils/numberToWords';
 import { sounds } from '../utils/sound';
-import { getEmployeeTotalAdvance } from '../utils/storage';
+import { getEmployeeTotalAdvance, getEmployeeTotalExpenses } from '../utils/storage';
 
 export default function SalarySlipModal({ 
   employee, 
   attendance, 
   advances = [],
+  expenses = [],
   config = {}, 
   monthYear = 'September 2026',
   onClose 
@@ -36,9 +39,10 @@ export default function SalarySlipModal({
   // Corporate Salary Structure - Base Salary and Basic Salary are ONE AND THE SAME (100%)
   const basic = baseMonthly;
   const overtimePay = stats.overtimePay || 0;
+  const siteAllowance = getEmployeeTotalExpenses(employee.id, expenses, '2026-09');
   const performanceBonus = 0;
 
-  const grossEarnings = basic + overtimePay + performanceBonus;
+  const grossEarnings = basic + overtimePay + siteAllowance + performanceBonus;
 
   // Deductions as per Statutory Option (PF & ESIC vs Non-PF / Non-ESIC)
   let epf = 0;
@@ -71,6 +75,44 @@ export default function SalarySlipModal({
   const handlePrint = () => {
     sounds.playSuccess();
     window.print();
+  };
+
+  const handleShareWhatsApp = () => {
+    sounds.playSuccess();
+    const phone = (employee.phone || '').replace(/[^0-9]/g, '');
+    const cleanPhone = phone.length === 10 ? `91${phone}` : phone;
+    const msg = `*SALARY PAYSLIP - ${monthYear.toUpperCase()}*
+*SK ENTERPRISES*
+303, Panchsheel CHS Ltd, Plot No 07, Sec -02, Taloja Phase -01, Navi Mumbai - 410208
+
+Employee: *${employee.name}* (${employee.id})
+Designation: ${employee.role} | Dept: ${employee.department}
+
+*Attendance Summary:*
+- Present: ${stats.inOffice + stats.wfh} Days
+- Week Off (WO): ${stats.weekOff || 0} Days
+- Paid Leave / Holiday: ${(stats.paidLeave || 0) + (stats.holidays || 0)} Days
+- Overtime: ${stats.totalOvertimeHours} hrs
+
+*Earnings Breakdown:*
+- Basic Salary: ₹${basic.toLocaleString('en-IN')}
+- Overtime Pay: ₹${overtimePay.toLocaleString('en-IN')}${siteAllowance > 0 ? `\n- Site Allowance / Batta: ₹${siteAllowance.toLocaleString('en-IN')}` : ''}
+*Gross Earnings: ₹${grossEarnings.toLocaleString('en-IN')}*
+
+*Deductions:*
+${isPfEsic ? `- EPF (12%): ₹${epf.toLocaleString('en-IN')}\n` : ''}${isPfEsic && esic > 0 ? `- ESIC (0.75%): ₹${esic.toLocaleString('en-IN')}\n` : ''}- Prof. Tax (PT): ₹${pt.toLocaleString('en-IN')}
+${lop > 0 ? `- Loss of Pay (LOP): ₹${lop.toLocaleString('en-IN')}\n` : ''}${advanceDeduction > 0 ? `- Advance Deducted: ₹${advanceDeduction.toLocaleString('en-IN')}\n` : ''}- Total Deductions: ₹${totalDeductions.toLocaleString('en-IN')}
+
+*Net Payable Salary: ₹${netPayable.toLocaleString('en-IN')}*
+In Words: ${netInWords}
+Ref: ${payslipRef}
+
+_Computer-generated salary slip from SK ENTERPRISES._`;
+
+    const url = cleanPhone 
+      ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -186,6 +228,14 @@ export default function SalarySlipModal({
 
           <div className="flex items-center gap-2">
             <button
+              onClick={handleShareWhatsApp}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all"
+              title="Share Salary Slip on WhatsApp"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>WhatsApp Slip</span>
+            </button>
+            <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/25 transition-all"
             >
@@ -268,11 +318,13 @@ export default function SalarySlipModal({
             <div className="grid grid-cols-4 divide-x divide-slate-300 border-t border-slate-300 bg-slate-50/60">
               <div className="p-1.5 px-2.5">
                 <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Bank Name</span>
-                <span className="font-bold text-slate-800 block">HDFC Bank Limited</span>
+                <span className="font-bold text-slate-800 block truncate">{employee.bankName || 'HDFC Bank Ltd'}</span>
               </div>
               <div className="p-1.5 px-2.5">
                 <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Bank Account No</span>
-                <span className="font-mono font-bold text-slate-800 block">•••• •••• •••• 4892</span>
+                <span className="font-mono font-bold text-slate-800 block truncate">
+                  {employee.bankAccountNo ? employee.bankAccountNo : '•••• •••• •••• 4892'}
+                </span>
               </div>
               <div className="p-1.5 px-2.5">
                 <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Income Tax PAN</span>
@@ -349,6 +401,12 @@ export default function SalarySlipModal({
                     <span className="text-purple-900 font-medium">Overtime ({stats.totalOvertimeHours}h @ 1.5x)</span>
                     <span className="font-mono font-bold text-purple-700">₹{overtimePay.toLocaleString('en-IN')}</span>
                   </div>
+                  {siteAllowance > 0 && (
+                    <div className="px-3 py-1 flex justify-between bg-amber-50/50">
+                      <span className="text-amber-900 font-medium">Site Allowance / Batta</span>
+                      <span className="font-mono font-bold text-amber-700">₹{siteAllowance.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                   <div className="px-3 py-1 flex justify-between">
                     <span className="text-slate-600">Performance Incentive / Bonus</span>
                     <span className="font-mono font-bold text-slate-900">₹0</span>
