@@ -26,7 +26,8 @@ import {
   Camera,
   Image as ImageIcon,
   IndianRupee,
-  Wallet
+  Wallet,
+  Contact
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateStatutoryComponents } from '../utils/attendanceCalculations';
 import { getEmployeeTotalAdvance } from '../utils/storage';
@@ -45,6 +46,7 @@ export default function MembersView({
   setConfig,
   onSelectEmployee, 
   onSaveToast,
+  onNavigate,
   role = 'admin' 
 }) {
   const isManager = role === 'manager';
@@ -337,6 +339,17 @@ export default function MembersView({
             <span>Export Roster CSV</span>
           </button>
 
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('idcards')}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-purple-600 hover:bg-purple-700 active:scale-95 text-white shadow-md shadow-purple-600/25 transition-all cursor-pointer"
+              title="Generate & Print Professional Employee ID Cards with QR Code"
+            >
+              <Contact className="w-3.5 h-3.5" />
+              <span>🪪 ID Cards Studio</span>
+            </button>
+          )}
+
           <button
             onClick={handleOpenAdd}
             className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white shadow-md shadow-blue-600/30 transition-all"
@@ -578,6 +591,17 @@ export default function MembersView({
                     <Wallet className="w-3.5 h-3.5" />
                     <span>Kharcha</span>
                   </button>
+
+                  {onNavigate && (
+                    <button
+                      onClick={() => onNavigate('idcards')}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 rounded-xl transition-colors cursor-pointer"
+                      title={`Print / Download ID Card for ${emp.name}`}
+                    >
+                      <Contact className="w-3.5 h-3.5" />
+                      <span>ID Card</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1">

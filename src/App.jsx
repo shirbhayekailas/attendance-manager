@@ -20,6 +20,7 @@ import UserAccessModal from './components/UserAccessModal';
 
 // Enterprise HRMS Suite Views
 import HRLettersView from './components/HRLettersView';
+import IdCardsView from './components/IdCardsView';
 import HolidayRosterView from './components/HolidayRosterView';
 import AssetsView from './components/AssetsView';
 import PerformanceView from './components/PerformanceView';
@@ -698,6 +699,7 @@ export default function App() {
               setConfig={setConfig}
               onSelectEmployee={setSelectedEmployee}
               onSaveToast={triggerToast}
+              onNavigate={setCurrentTab}
               role={currentUser.role}
             />
           )}
@@ -743,6 +745,15 @@ export default function App() {
           {effectiveTab === 'letters' && (
             <HRLettersView
               employees={employees}
+              config={config}
+              onSaveToast={triggerToast}
+            />
+          )}
+
+          {effectiveTab === 'idcards' && (
+            <IdCardsView
+              employees={employees}
+              setEmployees={setEmployees}
               config={config}
               onSaveToast={triggerToast}
             />
