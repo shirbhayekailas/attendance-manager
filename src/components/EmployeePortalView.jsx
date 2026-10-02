@@ -25,13 +25,15 @@ import {
   Laptop,
   HelpCircle,
   MessageSquare,
-  Tag
+  Tag,
+  Contact
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
 import { sounds } from '../utils/sound';
 import { getEmployeeTotalAdvance } from '../utils/storage';
 import SalarySlipModal from './SalarySlipModal';
+import IdCardsView from './IdCardsView';
 
 export default function EmployeePortalView({ 
   employee: rawEmployee, 
@@ -355,6 +357,18 @@ export default function EmployeePortalView({
           >
             <HelpCircle className="w-3.5 h-3.5" />
             <span>Helpdesk ({myTickets.length})</span>
+          </button>
+          <button
+            onClick={() => {
+              sounds.playSuccess();
+              setActiveTab('idcard');
+            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer ${
+              activeTab === 'idcard' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Contact className="w-3.5 h-3.5" />
+            <span>🪪 My ID Card</span>
           </button>
         </div>
       </div>
@@ -1321,6 +1335,18 @@ export default function EmployeePortalView({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* TAB 8: MY OFFICIAL EMPLOYEE ID CARD */}
+      {activeTab === 'idcard' && (
+        <div className="no-print space-y-4">
+          <IdCardsView
+            employees={[employee]}
+            config={config}
+            onSaveToast={onSaveToast}
+            initialEmpId={employee.id}
+          />
         </div>
       )}
 

@@ -27,12 +27,13 @@ import {
 import { sounds } from '../utils/sound';
 
 export default function IdCardsView({ 
-  employees, 
+  employees = [], 
   setEmployees, 
-  config, 
-  onSaveToast 
+  config = {}, 
+  onSaveToast,
+  initialEmpId = '' 
 }) {
-  const [selectedEmpId, setSelectedEmpId] = useState(() => employees[0]?.id || '');
+  const [selectedEmpId, setSelectedEmpId] = useState(() => initialEmpId || employees[0]?.id || '');
   const [selectedDept, setSelectedDept] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('single'); // 'single' | 'a4-sheet'
@@ -46,17 +47,24 @@ export default function IdCardsView({
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [qrCodeMap, setQrCodeMap] = useState({});
 
-  const departments = ['All', ...new Set(employees.map(e => e.department).filter(Boolean))];
+  useEffect(() => {
+    if (initialEmpId) {
+      setSelectedEmpId(initialEmpId);
+    }
+  }, [initialEmpId]);
 
-  const filteredEmployees = employees.filter(emp => {
-    const matchesSearch = emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          emp.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          emp.role.toLowerCase().includes(searchQuery.toLowerCase());
+  const departments = ['All', ...new Set((employees || []).map(e => e?.department).filter(Boolean))];
+
+  const filteredEmployees = (employees || []).filter(emp => {
+    if (!emp) return false;
+    const matchesSearch = (emp.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (emp.id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (emp.role || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesDept = selectedDept === 'All' || emp.department === selectedDept;
     return matchesSearch && matchesDept;
   });
 
-  const activeEmployee = employees.find(e => e.id === selectedEmpId) || filteredEmployees[0] || employees[0];
+  const activeEmployee = (employees.length > 0 && employees.find(e => e.id === selectedEmpId)) || filteredEmployees[0] || employees[0] || null;
 
   useEffect(() => {
     if (activeEmployee) {
@@ -230,7 +238,8 @@ export default function IdCardsView({
 
   // Single ID Card Component (Front & Back)
   const renderIdCardFront = (emp, isPrint = false) => {
-    const avatarUrl = emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name)}&background=1e3a8a&color=fff&size=160&bold=true`;
+    if (!emp) return null;
+    const avatarUrl = emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || 'Staff')}&background=1e3a8a&color=fff&size=160&bold=true`;
     return (
       <div 
         className={`w-[245px] h-[360px] rounded-2xl bg-white text-slate-900 shadow-xl overflow-hidden flex flex-col justify-between border border-slate-300 relative select-none ${isPrint ? 'print-card' : ''}`}
@@ -256,7 +265,7 @@ export default function IdCardsView({
             <div className={`w-20 h-20 rounded-2xl overflow-hidden ring-4 ring-white shadow-md border-2 border-slate-200 bg-slate-100 flex items-center justify-center`}>
               <img 
                 src={avatarUrl} 
-                alt={emp.name} 
+                alt={emp.name || 'Staff'} 
                 className="w-full h-full object-cover"
                 crossOrigin="anonymous"
               />
@@ -266,7 +275,7 @@ export default function IdCardsView({
 
           {/* Name & Role */}
           <h3 className="text-sm font-black text-slate-900 tracking-tight text-center leading-tight line-clamp-1">
-            {emp.name}
+            {emp.name || 'Staff Member'}
           </h3>
           <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md mt-0.5 max-w-[210px] truncate text-center">
             {emp.role || 'Corporate Staff'}
@@ -308,6 +317,7 @@ export default function IdCardsView({
   };
 
   const renderIdCardBack = (emp, isPrint = false) => {
+    if (!emp) return null;
     const qrUrl = qrCodeMap[emp.id];
     const contact = emp.id === activeEmployee?.id ? emergencyPhone : (emp.emergencyPhone || emp.phone || '+91 98765 43210');
 

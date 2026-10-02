@@ -26,6 +26,13 @@ import AssetsView from './components/AssetsView';
 import PerformanceView from './components/PerformanceView';
 import HelpdeskView from './components/HelpdeskView';
 import OrgChartView from './components/OrgChartView';
+import { 
+  LayoutDashboard, 
+  CheckSquare, 
+  Users, 
+  Contact, 
+  Menu 
+} from 'lucide-react';
 
 import { 
   INITIAL_EMPLOYEES, 
@@ -84,8 +91,16 @@ export default function App() {
   const [currentTab, setCurrentTab] = useState('dashboard');
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedIdCardEmpId, setSelectedIdCardEmpId] = useState('');
   const [toastMessage, setToastMessage] = useState('');
   const [syncStatus, setSyncStatus] = useState('syncing'); // 'synced' | 'syncing' | 'offline'
+
+  const handleNavigate = (tab, empId = null) => {
+    if (empId) setSelectedIdCardEmpId(empId);
+    setCurrentTab(tab);
+    setIsMobileMenuOpen(false);
+  };
 
   const isInitialSyncDone = useRef(false);
 
@@ -581,6 +596,7 @@ export default function App() {
     'kiosk', 
     'holidays', 
     'employees', 
+    'idcards', 
     'leaves', 
     'reports', 
     'performance', 
@@ -612,7 +628,8 @@ export default function App() {
         syncStatus={syncStatus}
         onLogout={() => handleLogout('manual')}
         onOpenUserAccess={() => setIsUserAccessOpen(true)}
-        onNavigate={setCurrentTab}
+        onNavigate={handleNavigate}
+        onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
         notifications={INITIAL_NOTIFICATIONS}
         onOpenSearch={() => setIsSearchOpen(true)}
       />
@@ -623,22 +640,24 @@ export default function App() {
         {/* Navigation Sidebar (Scoped by Role) */}
         <Sidebar
           currentTab={effectiveTab}
-          setCurrentTab={setCurrentTab}
+          setCurrentTab={handleNavigate}
           config={config}
           role={currentUser.role}
           pendingLeavesCount={pendingLeavesCount}
           todayLateCount={todayOverview.late}
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
         />
 
         {/* Tab View Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 pb-24 md:pb-8 overflow-y-auto">
           <ErrorBoundary onReset={() => setCurrentTab('dashboard')}>
             {effectiveTab === 'dashboard' && (
             <DashboardView
               employees={employees}
               attendance={attendance}
               config={config}
-              onNavigate={setCurrentTab}
+              onNavigate={handleNavigate}
               onSelectEmployee={setSelectedEmployee}
             />
           )}
@@ -651,7 +670,7 @@ export default function App() {
               config={config}
               onSaveToast={triggerToast}
               onSelectEmployee={setSelectedEmployee}
-              onNavigate={setCurrentTab}
+              onNavigate={handleNavigate}
             />
           )}
 
@@ -663,7 +682,7 @@ export default function App() {
               config={config}
               onSelectEmployee={setSelectedEmployee}
               onSaveToast={triggerToast}
-              onNavigate={setCurrentTab}
+              onNavigate={handleNavigate}
             />
           )}
 
@@ -700,7 +719,7 @@ export default function App() {
               setConfig={setConfig}
               onSelectEmployee={setSelectedEmployee}
               onSaveToast={triggerToast}
-              onNavigate={setCurrentTab}
+              onNavigate={handleNavigate}
               role={currentUser.role}
             />
           )}
@@ -757,6 +776,7 @@ export default function App() {
               setEmployees={setEmployees}
               config={config}
               onSaveToast={triggerToast}
+              initialEmpId={selectedIdCardEmpId}
             />
           )}
 
@@ -829,13 +849,73 @@ export default function App() {
         </main>
       </div>
 
+      {/* Mobile Bottom Quick-Access Action Bar (Admin & Manager) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-lg">
+        <button
+          onClick={() => handleNavigate('dashboard')}
+          className={`flex flex-col items-center gap-0.5 p-1 rounded-xl transition cursor-pointer ${
+            effectiveTab === 'dashboard' 
+              ? 'text-blue-600 dark:text-blue-400 font-black' 
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <LayoutDashboard className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Dashboard</span>
+        </button>
+
+        <button
+          onClick={() => handleNavigate('mark')}
+          className={`flex flex-col items-center gap-0.5 p-1 rounded-xl transition cursor-pointer ${
+            effectiveTab === 'mark' 
+              ? 'text-emerald-600 dark:text-emerald-400 font-black' 
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <CheckSquare className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Attendance</span>
+        </button>
+
+        <button
+          onClick={() => handleNavigate('employees')}
+          className={`flex flex-col items-center gap-0.5 p-1 rounded-xl transition cursor-pointer ${
+            effectiveTab === 'employees' 
+              ? 'text-indigo-600 dark:text-indigo-400 font-black' 
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <Users className="w-5 h-5" />
+          <span className="text-[10px] font-bold">Staff</span>
+        </button>
+
+        <button
+          onClick={() => handleNavigate('idcards')}
+          className={`flex flex-col items-center gap-0.5 p-1 rounded-xl relative transition cursor-pointer ${
+            effectiveTab === 'idcards' 
+              ? 'text-purple-600 dark:text-purple-400 font-black' 
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <Contact className="w-5 h-5" />
+          <span className="text-[10px] font-bold">🪪 ID Cards</span>
+          <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
+        </button>
+
+        <button
+          onClick={() => { sounds.playSuccess(); setIsMobileMenuOpen(true); }}
+          className="flex flex-col items-center gap-0.5 p-1 rounded-xl text-slate-500 dark:text-slate-400 transition cursor-pointer"
+        >
+          <Menu className="w-5 h-5" />
+          <span className="text-[10px] font-bold">All Pages</span>
+        </button>
+      </div>
+
       {/* Global Quick Search Modal (Ctrl+K) */}
       <GlobalSearchModal
         isOpen={isSearchOpen}
         onClose={setIsSearchOpen}
         employees={employees}
         onSelectEmployee={setSelectedEmployee}
-        onNavigate={setCurrentTab}
+        onNavigate={handleNavigate}
       />
 
       {/* Employee Dossier & Heatmap Modal */}
@@ -849,7 +929,7 @@ export default function App() {
             expenses={expenses}
             config={config}
             onClose={() => setSelectedEmployee(null)}
-            onNavigate={setCurrentTab}
+            onNavigate={handleNavigate}
           />
         </ErrorBoundary>
       )}
