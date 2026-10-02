@@ -468,15 +468,9 @@ app.post('/api/admin/creds', async (req, res) => {
   }
 });
 
-// 9. Reset Demo Dataset & Wipe Clean
+// 9. Reset Demo Dataset (Permanently Disabled) & Wipe Clean
 app.post('/api/reset-demo', async (req, res) => {
-  try {
-    const orgId = getOrgId(req);
-    const updated = await resetToDemo(orgId);
-    res.json({ success: true, data: updated, message: "Demo corporate data reloaded on server!" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+  res.json({ success: true, message: "Demo mode has been permanently removed. System is in real production mode." });
 });
 
 app.post('/api/wipe-clean', async (req, res) => {

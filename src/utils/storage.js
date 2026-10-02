@@ -38,10 +38,106 @@ export const defaultAdminCreds = {
   password: "1234", // DEFAULT ADMIN PASSWORD AS REQUESTED: 1234
 };
 
+// Signature filter to detect legacy dummy demo accounts
+export function isDemoEmployee(emp) {
+  if (!emp) return false;
+  const demoIds = ["EMP-101", "EMP-102", "EMP-103", "EMP-104", "EMP-105"];
+  const demoNames = ["Aarav Sharma", "Priya Patel", "Rohan Verma", "Ananya Iyer", "Vikram Malhotra"];
+  const idMatch = demoIds.includes(String(emp.id || '').toUpperCase());
+  const nameMatch = demoNames.includes(String(emp.name || '').trim());
+  return idMatch && nameMatch;
+}
+
 export function loadStoredData() {
   try {
-    const rawEmployees = localStorage.getItem(STORAGE_KEYS.EMPLOYEES);
-    const rawAttendance = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
+    // 1. Scan current and all legacy keys to recover any real user employee entries
+    const empKeysToScan = [
+      STORAGE_KEYS.EMPLOYEES,
+      "staffpulse_user_entries_vault",
+      "staffpulse_employees_v4_clean",
+      "staffpulse_employees_v3",
+      "staffpulse_employees_v2",
+      "staffpulse_employees",
+      "attendflow_members_v1",
+      "attendflow_employees",
+      "attendflow_members"
+    ];
+
+    const recoveredEmployeesMap = new Map();
+    empKeysToScan.forEach(k => {
+      try {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            list.forEach(emp => {
+              if (emp && emp.id && !isDemoEmployee(emp)) {
+                // If not already in map or richer data, keep user's actual employee
+                if (!recoveredEmployeesMap.has(emp.id)) {
+                  recoveredEmployeesMap.set(emp.id, emp);
+                }
+              }
+            });
+          }
+        }
+      } catch (e) {}
+    });
+
+    const realEmployees = Array.from(recoveredEmployeesMap.values());
+
+    // 2. Scan current and legacy keys to recover real attendance entries
+    const attKeysToScan = [
+      STORAGE_KEYS.ATTENDANCE,
+      "staffpulse_attendance_v4_clean",
+      "staffpulse_attendance_v3",
+      "staffpulse_attendance_v2",
+      "staffpulse_attendance",
+      "attendflow_attendance_v1",
+      "attendflow_attendance"
+    ];
+
+    const recoveredAttendance = {};
+    attKeysToScan.forEach(k => {
+      try {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const attObj = JSON.parse(raw);
+          if (attObj && typeof attObj === 'object') {
+            Object.entries(attObj).forEach(([dateStr, dayRecords]) => {
+              if (dayRecords && typeof dayRecords === 'object') {
+                if (!recoveredAttendance[dateStr]) recoveredAttendance[dateStr] = {};
+                Object.entries(dayRecords).forEach(([empId, rec]) => {
+                  if (!rec) return;
+                  const isDemoPunches = (
+                    ["EMP-101", "EMP-102", "EMP-103", "EMP-104", "EMP-105"].includes(empId) &&
+                    rec.note === "Regular Shift" &&
+                    rec.clockIn === "09:25 AM" &&
+                    rec.clockOut === "06:35 PM" &&
+                    !rec.isWeekOffDuty &&
+                    rec.status === 'present'
+                  );
+                  // If it's a real user punch, or user's custom employee, or edited status: PRESERVE!
+                  if (!isDemoPunches) {
+                    recoveredAttendance[dateStr][empId] = rec;
+                  }
+                });
+                if (Object.keys(recoveredAttendance[dateStr]).length === 0) {
+                  delete recoveredAttendance[dateStr];
+                }
+              }
+            });
+          }
+        }
+      } catch (e) {}
+    });
+
+    // Save recovered real entries back to clean keys & vault for permanent safety
+    try {
+      localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(realEmployees));
+      localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(recoveredAttendance));
+      localStorage.setItem("staffpulse_user_entries_vault", JSON.stringify(realEmployees));
+    } catch (e) {}
+
     const rawConfig = localStorage.getItem(STORAGE_KEYS.CONFIG);
     const rawLeaves = localStorage.getItem(STORAGE_KEYS.LEAVE_REQUESTS);
     const rawTheme = localStorage.getItem(STORAGE_KEYS.THEME);
@@ -59,8 +155,8 @@ export function loadStoredData() {
     };
 
     return {
-      employees: rawEmployees ? JSON.parse(rawEmployees) : [],
-      attendance: rawAttendance ? JSON.parse(rawAttendance) : {},
+      employees: realEmployees,
+      attendance: recoveredAttendance,
       leaves: rawLeaves ? JSON.parse(rawLeaves) : [],
       advances: rawAdvances ? JSON.parse(rawAdvances) : [],
       expenses: rawExpenses ? JSON.parse(rawExpenses) : [],
@@ -93,7 +189,9 @@ export function saveAdminCreds(creds) {
 
 export function saveEmployees(employees) {
   try {
-    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(employees));
+    const cleanList = (employees || []).filter(e => !isDemoEmployee(e));
+    localStorage.setItem(STORAGE_KEYS.EMPLOYEES, JSON.stringify(cleanList));
+    localStorage.setItem("staffpulse_user_entries_vault", JSON.stringify(cleanList));
   } catch (err) {
     console.error("Failed to save employees:", err);
   }

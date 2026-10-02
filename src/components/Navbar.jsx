@@ -24,7 +24,6 @@ export default function Navbar({
   setConfig,
   theme, 
   setTheme, 
-  onResetDemo,
   notifications = EMPTY_NOTIFICATIONS,
   onOpenSearch,
   currentUser,

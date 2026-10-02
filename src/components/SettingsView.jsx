@@ -32,7 +32,6 @@ export default function SettingsView({
   setLeaves, 
   adminCreds = { id: 'admin', email: 'admin@company.com', password: '1234' },
   setAdminCreds,
-  onResetDemo, 
   onWipeCleanData, 
   onSaveToast 
 }) {
@@ -450,22 +449,13 @@ export default function SettingsView({
             </button>
           </div>
 
-          {/* Reload Demo Data */}
-          <button
-            onClick={onResetDemo}
-            className="flex items-center justify-center gap-2 p-3 text-xs font-semibold rounded-xl bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/40 dark:hover:bg-amber-900/60 text-amber-700 dark:text-amber-300 transition-colors border border-amber-200 dark:border-amber-800/60"
-          >
-            <RotateCcw className="w-4 h-4 text-amber-500" />
-            <span>Reload 30-Day Corporate Records</span>
-          </button>
-
           {/* Wipe All Data Clean */}
           <button
             onClick={onWipeCleanData}
             className="col-span-1 sm:col-span-2 flex items-center justify-center gap-2 p-3 text-xs font-bold rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 text-rose-700 dark:text-rose-300 transition-colors border border-rose-300 dark:border-rose-800"
           >
             <Trash2 className="w-4 h-4 text-rose-600" />
-            <span>Wipe All Demo Data & Reset to Clean Slate</span>
+            <span>Wipe Database & Reset to Clean Slate</span>
           </button>
         </div>
       </div>

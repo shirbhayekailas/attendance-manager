@@ -22,8 +22,6 @@ import {
   INITIAL_EMPLOYEES, 
   INITIAL_LEAVE_REQUESTS, 
   INITIAL_NOTIFICATIONS,
-  DEMO_SAMPLE_EMPLOYEES,
-  generateCorporateHistory 
 } from './data/initialData';
 import { 
   loadStoredData, 
@@ -37,12 +35,12 @@ import {
   saveExpenses,
   defaultAdminCreds,
   wipeAllStoredData,
-  defaultCompanyConfig 
+  defaultCompanyConfig,
+  isDemoEmployee
 } from './utils/storage';
 import { 
   fetchServerSync, 
   pushServerSync, 
-  resetDemoOnServer, 
   wipeCleanOnServer 
 } from './utils/apiClient';
 import { getCompanyDailyOverview } from './utils/attendanceCalculations';
@@ -216,8 +214,47 @@ export default function App() {
 
       if (res.success && res.data) {
         const { data } = res;
-        if (data.employees) setEmployees(data.employees);
-        if (data.attendance) setAttendance(data.attendance);
+        
+        // 1. EMPLOYEES: Filter out any demo data and merge/preserve real user entries
+        const serverRealEmps = (data.employees || []).filter(e => !isDemoEmployee(e));
+        
+        setEmployees(prevLocal => {
+          const localRealEmps = (prevLocal || []).filter(e => !isDemoEmployee(e));
+          // If server has no real employees but local has real employees, PRESERVE LOCAL and push to server
+          if (serverRealEmps.length === 0 && localRealEmps.length > 0) {
+            pushServerSync({ employees: localRealEmps });
+            return localRealEmps;
+          }
+          // Merge by employee ID
+          const empMap = new Map();
+          localRealEmps.forEach(e => empMap.set(e.id, e));
+          serverRealEmps.forEach(e => empMap.set(e.id, e));
+          return Array.from(empMap.values());
+        });
+
+        // 2. ATTENDANCE: Merge server and local attendance, strictly preserving user-marked punches
+        if (data.attendance) {
+          setAttendance(prevLocal => {
+            const merged = { ...prevLocal };
+            Object.entries(data.attendance).forEach(([dateStr, serverRecords]) => {
+              if (serverRecords && typeof serverRecords === 'object') {
+                if (!merged[dateStr]) merged[dateStr] = {};
+                Object.entries(serverRecords).forEach(([empId, rec]) => {
+                  const isDemoPunch = ["EMP-101", "EMP-102", "EMP-103", "EMP-104", "EMP-105"].includes(empId) &&
+                    rec.note === "Regular Shift" &&
+                    rec.clockIn === "09:25 AM" &&
+                    rec.clockOut === "06:35 PM" &&
+                    !rec.isWeekOffDuty;
+                  if (!isDemoPunch) {
+                    merged[dateStr][empId] = { ...(merged[dateStr][empId] || {}), ...rec };
+                  }
+                });
+              }
+            });
+            return merged;
+          });
+        }
+
         if (data.leaves) setLeaves(data.leaves);
         if (data.advances) setAdvances(data.advances);
         if (data.expenses) setExpenses(data.expenses);
@@ -326,18 +363,6 @@ export default function App() {
     triggerToast("All data wiped across all devices! Admin password reset to default 1234.");
   };
 
-  // Optional Reload Demo Data on Local & Cloud Server
-  const handleResetDemoData = async () => {
-    if (window.confirm("Load sample corporate dataset for testing across all devices?")) {
-      const freshHistory = generateCorporateHistory(DEMO_SAMPLE_EMPLOYEES);
-      setEmployees(DEMO_SAMPLE_EMPLOYEES);
-      setAttendance(freshHistory);
-      setLeaves(INITIAL_LEAVE_REQUESTS);
-      await resetDemoOnServer();
-      sounds.playSuccess();
-      triggerToast("Sample corporate records loaded on cloud server!");
-    }
-  };
 
   const todayStr = new Date().toISOString().split('T')[0];
   const todayOverview = getCompanyDailyOverview(todayStr, employees, attendance);
@@ -493,7 +518,6 @@ export default function App() {
         syncStatus={syncStatus}
         onLogout={() => handleLogout('manual')}
         onOpenUserAccess={() => setIsUserAccessOpen(true)}
-        onResetDemo={handleResetDemoData}
         notifications={INITIAL_NOTIFICATIONS}
         onOpenSearch={() => setIsSearchOpen(true)}
       />
@@ -617,7 +641,6 @@ export default function App() {
               setLeaves={setLeaves}
               adminCreds={adminCreds}
               setAdminCreds={setAdminCreds}
-              onResetDemo={handleResetDemoData}
               onWipeCleanData={handleWipeCleanData}
               onSaveToast={triggerToast}
             />

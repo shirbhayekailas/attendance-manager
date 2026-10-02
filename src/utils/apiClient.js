@@ -144,16 +144,9 @@ export async function checkServerHealth() {
   }
 }
 
-// Reload sample demo corporate dataset on server
+// Demo reset permanently disabled
 export async function resetDemoOnServer() {
-  try {
-    const res = await fetch(`${API_BASE}/api/reset-demo`, { method: 'POST' });
-    if (!res.ok) throw new Error("Failed to reset demo on server");
-    return await res.json();
-  } catch (err) {
-    console.error("Reset demo failed:", err);
-    return null;
-  }
+  return { success: true, message: "Demo mode disabled" };
 }
 
 // Wipe all data cleanly on server

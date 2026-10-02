@@ -156,7 +156,7 @@ export default function DashboardView({
               No Employees Registered Yet
             </h3>
             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              All demo records have been cleared. Your corporate attendance system is fresh and ready for your real team.
+              Your corporate attendance system is ready. Onboard your staff members below to get started.
             </p>
           </div>
           <div className="pt-2 flex justify-center gap-3">
