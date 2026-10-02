@@ -18,6 +18,14 @@ import Toast from './components/Toast';
 import ErrorBoundary from './components/ErrorBoundary';
 import UserAccessModal from './components/UserAccessModal';
 
+// Enterprise HRMS Suite Views
+import HRLettersView from './components/HRLettersView';
+import HolidayRosterView from './components/HolidayRosterView';
+import AssetsView from './components/AssetsView';
+import PerformanceView from './components/PerformanceView';
+import HelpdeskView from './components/HelpdeskView';
+import OrgChartView from './components/OrgChartView';
+
 import { 
   INITIAL_EMPLOYEES, 
   INITIAL_LEAVE_REQUESTS, 
@@ -33,6 +41,12 @@ import {
   saveAdminCreds,
   saveAdvances,
   saveExpenses,
+  saveHolidays,
+  saveAssets,
+  savePerformance,
+  saveHelpdesk,
+  saveRegularizations,
+  defaultHolidays,
   defaultAdminCreds,
   wipeAllStoredData,
   defaultCompanyConfig,
@@ -56,6 +70,13 @@ export default function App() {
   const [advances, setAdvances] = useState(() => stored.advances || []);
   const [expenses, setExpenses] = useState(() => stored.expenses || []);
   const [adminCreds, setAdminCreds] = useState(() => stored.adminCreds || defaultAdminCreds);
+
+  // HRMS Suite Data Collections
+  const [holidays, setHolidays] = useState(() => stored.holidays || defaultHolidays);
+  const [assets, setAssets] = useState(() => stored.assets || []);
+  const [performance, setPerformance] = useState(() => stored.performance || []);
+  const [helpdesk, setHelpdesk] = useState(() => stored.helpdesk || []);
+  const [regularizations, setRegularizations] = useState(() => stored.regularizations || []);
 
   const [config, setConfig] = useState(() => stored.config || defaultCompanyConfig);
   const [theme, setTheme] = useState(() => stored.theme || 'dark');
@@ -258,6 +279,11 @@ export default function App() {
         if (data.leaves) setLeaves(data.leaves);
         if (data.advances) setAdvances(data.advances);
         if (data.expenses) setExpenses(data.expenses);
+        if (data.holidays && Array.isArray(data.holidays) && data.holidays.length > 0) setHolidays(data.holidays);
+        if (data.assets) setAssets(data.assets);
+        if (data.performance) setPerformance(data.performance);
+        if (data.helpdesk) setHelpdesk(data.helpdesk);
+        if (data.regularizations) setRegularizations(data.regularizations);
         if (data.config) setConfig(prev => ({ ...prev, ...data.config }));
         if (data.adminCreds) setAdminCreds(data.adminCreds);
         setSyncStatus('synced');
@@ -345,6 +371,46 @@ export default function App() {
     }
   }, [expenses]);
 
+  useEffect(() => {
+    saveHolidays(holidays);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ holidays }).then(() => setSyncStatus('synced'));
+    }
+  }, [holidays]);
+
+  useEffect(() => {
+    saveAssets(assets);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ assets }).then(() => setSyncStatus('synced'));
+    }
+  }, [assets]);
+
+  useEffect(() => {
+    savePerformance(performance);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ performance }).then(() => setSyncStatus('synced'));
+    }
+  }, [performance]);
+
+  useEffect(() => {
+    saveHelpdesk(helpdesk);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ helpdesk }).then(() => setSyncStatus('synced'));
+    }
+  }, [helpdesk]);
+
+  useEffect(() => {
+    saveRegularizations(regularizations);
+    if (isInitialSyncDone.current) {
+      setSyncStatus('syncing');
+      pushServerSync({ regularizations }).then(() => setSyncStatus('synced'));
+    }
+  }, [regularizations]);
+
   const triggerToast = (msg) => {
     setToastMessage(msg);
   };
@@ -357,6 +423,11 @@ export default function App() {
     setLeaves([]);
     setAdvances([]);
     setExpenses([]);
+    setHolidays(defaultHolidays);
+    setAssets([]);
+    setPerformance([]);
+    setHelpdesk([]);
+    setRegularizations([]);
     setAdminCreds(defaultAdminCreds);
     await wipeCleanOnServer();
     sounds.playSuccess();
@@ -440,6 +511,12 @@ export default function App() {
               advances={advances}
               expenses={expenses}
               config={config}
+              holidays={holidays}
+              assets={assets}
+              helpdesk={helpdesk}
+              setHelpdesk={setHelpdesk}
+              regularizations={regularizations}
+              setRegularizations={setRegularizations}
               onSaveToast={triggerToast}
             />
           </ErrorBoundary>
@@ -496,7 +573,23 @@ export default function App() {
 
   // 3. ADMIN & MANAGER ROLES: Render Corporate Workspace (Scoped by Role)
   const isManager = currentUser.role === 'manager';
-  const VALID_ADMIN_TABS = ['dashboard', 'mark', 'monthly', 'kiosk', 'employees', 'leaves', 'reports', 'audit', 'settings'];
+  const VALID_ADMIN_TABS = [
+    'dashboard', 
+    'mark', 
+    'monthly', 
+    'kiosk', 
+    'holidays', 
+    'employees', 
+    'leaves', 
+    'reports', 
+    'performance', 
+    'letters', 
+    'assets', 
+    'helpdesk', 
+    'orgchart', 
+    'audit', 
+    'settings'
+  ];
   let effectiveTab = currentTab;
   if (!VALID_ADMIN_TABS.includes(effectiveTab)) {
     effectiveTab = 'dashboard';
@@ -582,6 +675,16 @@ export default function App() {
             />
           )}
 
+          {effectiveTab === 'holidays' && (
+            <HolidayRosterView
+              holidays={holidays}
+              setHolidays={setHolidays}
+              config={config}
+              employees={employees}
+              onSaveToast={triggerToast}
+            />
+          )}
+
           {effectiveTab === 'employees' && (
             <MembersView
               employees={employees}
@@ -606,6 +709,10 @@ export default function App() {
               employees={employees}
               setEmployees={setEmployees}
               onSaveToast={triggerToast}
+              attendance={attendance}
+              setAttendance={setAttendance}
+              regularizations={regularizations}
+              setRegularizations={setRegularizations}
             />
           )}
 
@@ -620,6 +727,53 @@ export default function App() {
               config={config}
               onSaveToast={triggerToast}
               role={currentUser.role}
+            />
+          )}
+
+          {effectiveTab === 'performance' && (
+            <PerformanceView
+              performance={performance}
+              setPerformance={setPerformance}
+              employees={employees}
+              config={config}
+              onSaveToast={triggerToast}
+            />
+          )}
+
+          {effectiveTab === 'letters' && (
+            <HRLettersView
+              employees={employees}
+              config={config}
+              onSaveToast={triggerToast}
+            />
+          )}
+
+          {effectiveTab === 'assets' && (
+            <AssetsView
+              assets={assets}
+              setAssets={setAssets}
+              employees={employees}
+              config={config}
+              onSaveToast={triggerToast}
+            />
+          )}
+
+          {effectiveTab === 'helpdesk' && (
+            <HelpdeskView
+              helpdesk={helpdesk}
+              setHelpdesk={setHelpdesk}
+              employees={employees}
+              config={config}
+              onSaveToast={triggerToast}
+              role={currentUser.role}
+            />
+          )}
+
+          {effectiveTab === 'orgchart' && (
+            <OrgChartView
+              employees={employees}
+              config={config}
+              onSelectEmployee={setSelectedEmployee}
             />
           )}
 

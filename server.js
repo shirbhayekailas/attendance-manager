@@ -193,6 +193,11 @@ app.get('/api/sync', (req, res) => {
       leaves: db.leaves || [],
       advances: db.advances || [],
       expenses: db.expenses || [],
+      holidays: db.holidays || [],
+      assets: db.assets || [],
+      performance: db.performance || [],
+      helpdesk: db.helpdesk || [],
+      regularizations: db.regularizations || [],
       config: db.config || {},
       adminCreds: db.adminCreds || {},
       lastUpdated: db.lastUpdated || new Date().toISOString(),
@@ -206,7 +211,20 @@ app.get('/api/sync', (req, res) => {
 app.post('/api/sync', async (req, res) => {
   try {
     const orgId = getOrgId(req);
-    const { employees, attendance, leaves, advances, expenses, config, adminCreds } = req.body;
+    const { 
+      employees, 
+      attendance, 
+      leaves, 
+      advances, 
+      expenses, 
+      holidays, 
+      assets, 
+      performance, 
+      helpdesk, 
+      regularizations, 
+      config, 
+      adminCreds 
+    } = req.body;
     
     const updated = await updateDatabase((current) => ({
       ...current,
@@ -215,6 +233,11 @@ app.post('/api/sync', async (req, res) => {
       leaves: leaves !== undefined ? leaves : current.leaves,
       advances: advances !== undefined ? advances : current.advances,
       expenses: expenses !== undefined ? expenses : (current.expenses || []),
+      holidays: holidays !== undefined ? holidays : (current.holidays || []),
+      assets: assets !== undefined ? assets : (current.assets || []),
+      performance: performance !== undefined ? performance : (current.performance || []),
+      helpdesk: helpdesk !== undefined ? helpdesk : (current.helpdesk || []),
+      regularizations: regularizations !== undefined ? regularizations : (current.regularizations || []),
       config: config !== undefined ? config : current.config,
       adminCreds: adminCreds !== undefined ? adminCreds : current.adminCreds,
     }), orgId);

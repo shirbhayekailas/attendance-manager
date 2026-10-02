@@ -21,7 +21,11 @@ import {
   ShieldCheck,
   ChevronLeft,
   ChevronRight,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Laptop,
+  HelpCircle,
+  MessageSquare,
+  Tag
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
@@ -36,7 +40,14 @@ export default function EmployeePortalView({
   leaves = [], 
   setLeaves, 
   advances = [],
+  expenses = [],
   config = {}, 
+  holidays = [],
+  assets = [],
+  helpdesk = [],
+  setHelpdesk,
+  regularizations = [],
+  setRegularizations,
   onSaveToast 
 }) {
   const employee = {
@@ -84,8 +95,40 @@ export default function EmployeePortalView({
   // Stats for this employee only
   const stats = calculateEmployeeStats(employee.id, attendance, employee.salaryMonthly || 100000, 22);
 
-  // My leaves only
+  // Filtered employee data
   const myLeaves = leaves.filter(l => l.empId === employee.id);
+  const myAssets = assets.filter(a => a.assignedTo === employee.id);
+  const myTickets = helpdesk.filter(t => t.empId === employee.id);
+
+  // Ticket Modal Form State
+  const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketCategory, setTicketCategory] = useState('Payroll & Salary');
+  const [ticketPriority, setTicketPriority] = useState('Medium');
+  const [ticketDescription, setTicketDescription] = useState('');
+
+  const handleRaiseTicket = (e) => {
+    e.preventDefault();
+    if (!ticketSubject.trim()) return;
+    sounds.playSuccess();
+    const newTicket = {
+      id: `TCK-${Math.floor(300 + Math.random() * 700)}`,
+      empId: employee.id,
+      subject: ticketSubject.trim(),
+      category: ticketCategory,
+      priority: ticketPriority,
+      description: ticketDescription.trim(),
+      status: 'pending',
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    if (setHelpdesk) {
+      setHelpdesk([newTicket, ...helpdesk]);
+    }
+    setTicketSubject('');
+    setTicketDescription('');
+    setIsTicketModalOpen(false);
+    onSaveToast(`Ticket raised successfully! SLA response within 24 hours.`);
+  };
 
   // Punch In Handler
   const handlePunchIn = () => {
@@ -276,6 +319,42 @@ export default function EmployeePortalView({
             }`}
           >
             My Payslip
+          </button>
+          <button
+            onClick={() => {
+              sounds.playSuccess();
+              setActiveTab('holidays');
+            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
+              activeTab === 'holidays' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            <span>Holidays</span>
+          </button>
+          <button
+            onClick={() => {
+              sounds.playSuccess();
+              setActiveTab('assets');
+            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
+              activeTab === 'assets' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <Laptop className="w-3.5 h-3.5" />
+            <span>Assets ({myAssets.length})</span>
+          </button>
+          <button
+            onClick={() => {
+              sounds.playSuccess();
+              setActiveTab('helpdesk');
+            }}
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
+              activeTab === 'helpdesk' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+            }`}
+          >
+            <HelpCircle className="w-3.5 h-3.5" />
+            <span>Helpdesk ({myTickets.length})</span>
           </button>
         </div>
       </div>
@@ -1016,6 +1095,235 @@ export default function EmployeePortalView({
         </div>
       )}
 
+      {/* TAB: COMPANY HOLIDAYS */}
+      {activeTab === 'holidays' && (
+        <div className="no-print space-y-6">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-amber-500" />
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Official Company Holiday Calendar (2026-27)</h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">All gazetted and national holidays are 100% paid holidays (PH) as per Indian labour law.</p>
+            </div>
+            <div className="px-3.5 py-1.5 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 text-xs font-bold text-amber-700 dark:text-amber-300">
+              Total {holidays.length} Paid Holidays
+            </div>
+          </div>
+
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                    <th className="py-3 px-4">Holiday Occasion</th>
+                    <th className="py-3 px-4">Date & Day</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4">Pay Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 text-xs">
+                  {holidays.map((h) => {
+                    const isUpcoming = h.date >= todayStr;
+                    return (
+                      <tr key={h.id || h.date} className={`hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors ${isUpcoming ? 'bg-amber-50/20 dark:bg-amber-950/10' : ''}`}>
+                        <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">
+                          <div className="flex items-center gap-2">
+                            <span>{h.name}</span>
+                            {isUpcoming && (
+                              <span className="px-2 py-0.2 rounded-full text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 font-extrabold border border-amber-300/40">
+                                Upcoming
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-3 px-4 font-mono font-bold text-slate-700 dark:text-slate-300">
+                          {h.date}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="capitalize px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 font-semibold text-slate-600 dark:text-slate-300">
+                            {h.type}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                            Full Paid (PH)
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TAB: ASSIGNED ASSETS */}
+      {activeTab === 'assets' && (
+        <div className="no-print space-y-6">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Laptop className="w-5 h-5 text-blue-500" />
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">Assigned Company Assets &amp; Custody</h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">Official IT hardware, communication devices, and equipment issued in your name.</p>
+            </div>
+            <div className="px-3.5 py-1.5 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-xs font-bold text-blue-700 dark:text-blue-300">
+              {myAssets.length} Active Items Assigned
+            </div>
+          </div>
+
+          {myAssets.length === 0 ? (
+            <div className="bg-white dark:bg-slate-900 p-12 rounded-3xl border border-slate-200/80 dark:border-slate-800 text-center">
+              <Laptop className="w-12 h-12 mx-auto text-slate-400 opacity-40 mb-3" />
+              <h4 className="text-sm font-bold text-slate-700 dark:text-slate-300">No Assets Currently Assigned</h4>
+              <p className="text-xs text-slate-400 mt-1">Any laptop, corporate SIM, or field tools assigned to you by IT/HR will appear here.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {myAssets.map((asset) => (
+                <div key={asset.id} className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-500">
+                        {asset.id} • {asset.category}
+                      </span>
+                      <h4 className="text-sm font-black text-slate-900 dark:text-white mt-1.5">{asset.name}</h4>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                      In Possession
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold">Serial Number</span>
+                      <p className="font-mono font-bold text-slate-700 dark:text-slate-300 truncate">{asset.serialNo || 'N/A'}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold">Issued Date</span>
+                      <p className="font-semibold text-slate-700 dark:text-slate-300">{asset.issueDate || 'Standard Issue'}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold">Hardware Condition</span>
+                      <p className="font-semibold text-emerald-600 dark:text-emerald-400">{asset.condition || 'Good'}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 text-[10px] uppercase font-bold">Estimated Value</span>
+                      <p className="font-mono font-semibold text-slate-700 dark:text-slate-300">₹{(asset.value || 0).toLocaleString('en-IN')}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB: HR HELPDESK & GRIEVANCES */}
+      {activeTab === 'helpdesk' && (
+        <div className="no-print space-y-6">
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <HelpCircle className="w-5 h-5 text-indigo-500" />
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">HR Helpdesk &amp; Grievance Redressal</h3>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">Submit payroll queries, PF/ESIC updates, or workplace assistance with guaranteed 24h SLA.</p>
+            </div>
+            <button
+              onClick={() => {
+                sounds.playSuccess();
+                setIsTicketModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs shadow-md shadow-indigo-600/30 transition active:scale-95 self-start md:self-auto"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Raise Support Ticket</span>
+            </button>
+          </div>
+
+          {/* Ticket Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
+              <span className="text-[10px] font-black uppercase text-slate-400">Total Tickets</span>
+              <div className="text-xl font-black text-slate-900 dark:text-white mt-1">{myTickets.length}</div>
+            </div>
+            <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20">
+              <span className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">Under Review</span>
+              <div className="text-xl font-black text-slate-900 dark:text-white mt-1">
+                {myTickets.filter(t => t.status === 'pending').length}
+              </div>
+            </div>
+            <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/20">
+              <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">Resolved by HR</span>
+              <div className="text-xl font-black text-slate-900 dark:text-white mt-1">
+                {myTickets.filter(t => t.status === 'resolved').length}
+              </div>
+            </div>
+          </div>
+
+          {/* Tickets List */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+            {myTickets.length === 0 ? (
+              <div className="p-12 text-center text-slate-400">
+                <HelpCircle className="w-10 h-10 mx-auto mb-2 opacity-30 text-indigo-500" />
+                <h4 className="font-bold text-slate-600 dark:text-slate-300 text-sm">No Support Tickets Raised</h4>
+                <p className="text-xs text-slate-400 mt-1">Need help with your salary slip, PF number, or leave balance? Click "+ Raise Support Ticket".</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100 dark:divide-slate-800/60">
+                {myTickets.map((t) => (
+                  <div key={t.id} className="p-5 space-y-2 hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2 py-0.5 rounded-md font-mono text-[10px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500">
+                          {t.id}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
+                          {t.category}
+                        </span>
+                        <h4 className="font-extrabold text-sm text-slate-900 dark:text-white">{t.subject}</h4>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-slate-400">Logged on {t.createdAt}</span>
+                        {t.status === 'resolved' ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                            Resolved
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800 flex items-center gap-1 animate-pulse">
+                            <Clock className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                            In Progress (SLA &lt;24h)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-600 dark:text-slate-300 pl-1">{t.description}</p>
+
+                    {t.status === 'resolved' && t.resolution && (
+                      <div className="mt-2 p-3 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/80 text-xs">
+                        <div className="font-bold text-emerald-900 dark:text-emerald-200 flex items-center gap-1.5 mb-0.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                          <span>HR Resolution Note • {t.resolvedBy || 'HR Admin'}</span>
+                        </div>
+                        <p className="text-emerald-800 dark:text-emerald-300">{t.resolution}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Apply Leave Modal */}
       {isApplyLeaveOpen && (
         <div className="no-print fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1094,6 +1402,96 @@ export default function EmployeePortalView({
                   className="px-5 py-2 text-xs font-bold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-md"
                 >
                   Submit Application
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Raise Ticket Modal */}
+      {isTicketModalOpen && (
+        <div className="no-print fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div>
+                <h3 className="font-extrabold text-slate-900 dark:text-white text-base">Raise HR Support Ticket</h3>
+                <p className="text-xs text-slate-400">Guaranteed 24-hour response SLA</p>
+              </div>
+              <button onClick={() => setIsTicketModalOpen(false)} className="p-1 rounded-lg text-slate-400 hover:text-slate-600">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleRaiseTicket} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Subject</label>
+                <input
+                  type="text"
+                  required
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  placeholder="e.g. Discrepancy in Sunday Overtime Credit"
+                  className="w-full p-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Category</label>
+                  <select
+                    value={ticketCategory}
+                    onChange={(e) => setTicketCategory(e.target.value)}
+                    className="w-full p-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-semibold"
+                  >
+                    <option value="Payroll & Salary">Payroll & Salary</option>
+                    <option value="PF & Statutory">PF & Statutory</option>
+                    <option value="Leaves & Attendance">Leaves & Attendance</option>
+                    <option value="Asset & Hardware">Asset & Hardware</option>
+                    <option value="General HR Support">General HR Support</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Priority</label>
+                  <select
+                    value={ticketPriority}
+                    onChange={(e) => setTicketPriority(e.target.value)}
+                    className="w-full p-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-semibold"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                    <option value="Urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">Description / Issue Details</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={ticketDescription}
+                  onChange={(e) => setTicketDescription(e.target.value)}
+                  placeholder="Explain the issue clearly so HR can assist you quickly..."
+                  className="w-full p-2.5 text-xs rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsTicketModalOpen(false)}
+                  className="px-4 py-2 text-xs font-semibold rounded-xl text-slate-600 dark:text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 text-xs font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 shadow-md"
+                >
+                  Submit Ticket
                 </button>
               </div>
             </form>

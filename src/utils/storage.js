@@ -9,7 +9,30 @@ const STORAGE_KEYS = {
   ADMIN_CREDS: "staffpulse_admin_creds_v4_clean",
   ADVANCES: "staffpulse_advances_v4_clean",
   EXPENSES: "staffpulse_expenses_v4_clean",
+  HOLIDAYS: "staffpulse_holidays_v4_clean",
+  ASSETS: "staffpulse_assets_v4_clean",
+  PERFORMANCE: "staffpulse_performance_v4_clean",
+  HELPDESK: "staffpulse_helpdesk_v4_clean",
+  REGULARIZATIONS: "staffpulse_regularizations_v4_clean",
 };
+
+export const defaultHolidays = [
+  { id: 'HOL-01', name: 'Republic Day', date: '2026-01-26', type: 'national', isPaid: true },
+  { id: 'HOL-02', name: 'Maha Shivratri', date: '2026-02-16', type: 'festival', isPaid: true },
+  { id: 'HOL-03', name: 'Holi (Dhulivandan)', date: '2026-03-04', type: 'festival', isPaid: true },
+  { id: 'HOL-04', name: 'Gudi Padwa', date: '2026-03-20', type: 'regional', isPaid: true },
+  { id: 'HOL-05', name: 'Eid-ul-Fitr (Ramzan Eid)', date: '2026-03-21', type: 'festival', isPaid: true },
+  { id: 'HOL-06', name: 'Dr. B.R. Ambedkar Jayanti', date: '2026-04-14', type: 'gazetted', isPaid: true },
+  { id: 'HOL-07', name: 'Maharashtra Day / May Day', date: '2026-05-01', type: 'state', isPaid: true },
+  { id: 'HOL-08', name: 'Bakri Eid (Eid-ul-Adha)', date: '2026-05-28', type: 'festival', isPaid: true },
+  { id: 'HOL-09', name: 'Independence Day', date: '2026-08-15', type: 'national', isPaid: true },
+  { id: 'HOL-10', name: 'Ganesh Chaturthi', date: '2026-09-14', type: 'festival', isPaid: true },
+  { id: 'HOL-11', name: 'Mahatma Gandhi Jayanti', date: '2026-10-02', type: 'national', isPaid: true },
+  { id: 'HOL-12', name: 'Dussehra (Vijayadashami)', date: '2026-10-20', type: 'festival', isPaid: true },
+  { id: 'HOL-13', name: 'Diwali (Laxmi Pujan)', date: '2026-11-09', type: 'festival', isPaid: true },
+  { id: 'HOL-14', name: 'Diwali (Balipratipada)', date: '2026-11-10', type: 'festival', isPaid: true },
+  { id: 'HOL-15', name: 'Christmas Day', date: '2026-12-25', type: 'festival', isPaid: true },
+];
 
 export const defaultCompanyConfig = {
   companyName: "SK ENTERPRISES",
@@ -144,6 +167,11 @@ export function loadStoredData() {
     const rawAdminCreds = localStorage.getItem(STORAGE_KEYS.ADMIN_CREDS);
     const rawAdvances = localStorage.getItem(STORAGE_KEYS.ADVANCES);
     const rawExpenses = localStorage.getItem(STORAGE_KEYS.EXPENSES);
+    const rawHolidays = localStorage.getItem(STORAGE_KEYS.HOLIDAYS);
+    const rawAssets = localStorage.getItem(STORAGE_KEYS.ASSETS);
+    const rawPerformance = localStorage.getItem(STORAGE_KEYS.PERFORMANCE);
+    const rawHelpdesk = localStorage.getItem(STORAGE_KEYS.HELPDESK);
+    const rawRegularizations = localStorage.getItem(STORAGE_KEYS.REGULARIZATIONS);
 
     const parsedConfig = rawConfig ? JSON.parse(rawConfig) : {};
     const finalConfig = {
@@ -160,6 +188,11 @@ export function loadStoredData() {
       leaves: rawLeaves ? JSON.parse(rawLeaves) : [],
       advances: rawAdvances ? JSON.parse(rawAdvances) : [],
       expenses: rawExpenses ? JSON.parse(rawExpenses) : [],
+      holidays: rawHolidays ? JSON.parse(rawHolidays) : defaultHolidays,
+      assets: rawAssets ? JSON.parse(rawAssets) : [],
+      performance: rawPerformance ? JSON.parse(rawPerformance) : [],
+      helpdesk: rawHelpdesk ? JSON.parse(rawHelpdesk) : [],
+      regularizations: rawRegularizations ? JSON.parse(rawRegularizations) : [],
       config: finalConfig,
       theme: rawTheme || "dark",
       adminCreds: rawAdminCreds ? JSON.parse(rawAdminCreds) : defaultAdminCreds,
@@ -172,6 +205,11 @@ export function loadStoredData() {
       leaves: [],
       advances: [],
       expenses: [],
+      holidays: defaultHolidays,
+      assets: [],
+      performance: [],
+      helpdesk: [],
+      regularizations: [],
       config: defaultCompanyConfig,
       theme: "dark",
       adminCreds: defaultAdminCreds,
@@ -248,6 +286,46 @@ export function saveConfig(config) {
     localStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
   } catch (err) {
     console.error("Failed to save company config:", err);
+  }
+}
+
+export function saveHolidays(holidays) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.HOLIDAYS, JSON.stringify(holidays));
+  } catch (err) {
+    console.error("Failed to save holidays:", err);
+  }
+}
+
+export function saveAssets(assets) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(assets));
+  } catch (err) {
+    console.error("Failed to save assets:", err);
+  }
+}
+
+export function savePerformance(performance) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.PERFORMANCE, JSON.stringify(performance));
+  } catch (err) {
+    console.error("Failed to save performance records:", err);
+  }
+}
+
+export function saveHelpdesk(tickets) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.HELPDESK, JSON.stringify(tickets));
+  } catch (err) {
+    console.error("Failed to save helpdesk tickets:", err);
+  }
+}
+
+export function saveRegularizations(regularizations) {
+  try {
+    localStorage.setItem(STORAGE_KEYS.REGULARIZATIONS, JSON.stringify(regularizations));
+  } catch (err) {
+    console.error("Failed to save regularizations:", err);
   }
 }
 

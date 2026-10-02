@@ -10,7 +10,9 @@ import {
   ShieldCheck,
   Building2,
   FileCheck2,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Calendar,
+  Award
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
 
@@ -55,6 +57,13 @@ export default function Sidebar({
           badge: 'Kiosk',
           badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
         },
+        {
+          id: 'holidays',
+          label: 'Holidays & Shift Master',
+          icon: Calendar,
+          badge: '2026-27',
+          badgeColor: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+        },
       ]
     },
     {
@@ -62,21 +71,58 @@ export default function Sidebar({
       items: [
         {
           id: 'employees',
-          label: isManager ? 'Team Directory & Staff' : 'Staff & Employees (Add/Edit)',
+          label: isManager ? 'Team Directory & Staff' : 'Staff & Employees Directory',
           icon: Users,
           badge: null,
         },
         {
           id: 'leaves',
-          label: 'Leave Management',
+          label: 'Leaves & Regularization',
           icon: CalendarDays,
           badge: pendingLeavesCount > 0 ? `${pendingLeavesCount} Pending` : null,
           badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold',
         },
         {
           id: 'reports',
-          label: 'Payroll & Timesheet Reports',
+          label: 'Payroll & Timesheet Ledger',
           icon: FileSpreadsheet,
+          badge: null,
+        },
+        {
+          id: 'performance',
+          label: 'Performance & Appraisals',
+          icon: Award,
+          badge: 'KRA',
+          badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
+        },
+      ]
+    },
+    {
+      title: "HR OPERATIONS & SERVICES",
+      items: [
+        {
+          id: 'letters',
+          label: 'HR Letters & Doc Studio',
+          icon: FileCheck2,
+          badge: '1-Click',
+          badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
+        },
+        {
+          id: 'assets',
+          label: 'Company Assets & IT Custody',
+          icon: Building2,
+          badge: null,
+        },
+        {
+          id: 'helpdesk',
+          label: 'HR Helpdesk & Grievances',
+          icon: SlidersHorizontal,
+          badge: null,
+        },
+        {
+          id: 'orgchart',
+          label: 'Organization Hierarchy',
+          icon: Users,
           badge: null,
         },
       ]
