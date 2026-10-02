@@ -105,7 +105,8 @@ export function calculateMonthlyPayrollStats({
     const isSunday = dayOfWeek === 0;
     const rec = safeAttendance[dateStr]?.[empId];
 
-    let status = rec?.status || (isSunday ? 'week_off' : 'none');
+    // Only set status from actual recorded entry (do not default to week_off unless user marked it)
+    let status = rec?.status || 'none';
     const ot = (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
       ? Number(rec.overtimeHours)
       : ((rec?.clockIn && rec?.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--')
@@ -149,14 +150,9 @@ export function calculateMonthlyPayrollStats({
         weekOffDuty++;
       }
     } else {
-      if (isSunday) {
-        weekOff++;
-      } else {
-        const todayStr = new Date().toISOString().split('T')[0];
-        if (dateStr <= todayStr) {
-          unpaidAbsent++;
-        }
-      }
+      // Unmarked / No entry date:
+      // STRICT: Only count Week-Off as payable when explicitly marked by user (status === 'week_off' || 'wo')!
+      // Do NOT automatically grant 4 week-offs in advance.
     }
 
     dayLogs.push({
@@ -170,18 +166,20 @@ export function calculateMonthlyPayrollStats({
     });
   }
 
-  // Enterprise HRMS Standard (Keka / GreytHR / Darwinbox):
-  // 1. Regular Cycle Payable Days: Weekday working days + paid leaves + all calendar week-offs + holidays
+  // 1. Regular Office Days (excluding week off duty which receives 1 regular + 1 bonus day)
   const regularOffice = Math.max(0, inOffice - weekOffDuty);
-  const totalCalendarWeekOffs = weekOff + weekOffDuty;
-  const standardRegularPayable = Math.min(daysInMonth, regularOffice + wfh + paidLeave + totalCalendarWeekOffs + holidays + (halfDay * 0.5));
-  
-  // 2. Week Off Duty (WO-P / Rest Day Working): Adds +1 full payable day to total paid days!
-  const payableDays = standardRegularPayable + weekOffDuty;
+
+  // 2. Payable Days:
+  // ONLY count weekOff when explicitly marked by user (rec.status === 'week_off' || 'wo')!
+  // Working on Week Off (weekOffDuty) grants 1 day regular work + 1 extra bonus day (+1 paid day)
+  const payableDays = regularOffice + wfh + paidLeave + weekOff + holidays + (halfDay * 0.5) + (weekOffDuty * 2);
+
+  // Standard regular payable days (excluding extra bonus day, for LOP calculation)
+  const standardRegularPayable = regularOffice + wfh + paidLeave + weekOff + holidays + (halfDay * 0.5) + weekOffDuty;
   const lopDays = Math.max(0, daysInMonth - standardRegularPayable);
 
   const lossOfPayDeduction = Math.round(lopDays * perDaySalary);
-  const earnedBasic = Math.max(0, Math.round(baseSalary - lossOfPayDeduction));
+  const earnedBasic = Math.max(0, Math.min(baseSalary, baseSalary - lossOfPayDeduction));
   const overtimePay = Math.round(totalOvertimeHours * hourlyRate * 1.5);
   const weekOffDutyPay = Math.round(weekOffDuty * perDaySalary); // Extra 1.0x day pay for working on rest day
 
@@ -322,10 +320,10 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
     }
   });
 
-  // Enterprise HRMS Standard: Working on a Week-Off adds +1.0 full day to total payable days
+  // Working on a Week-Off adds +1.0 full day to total payable days:
+  // inOffice + wfh + paidLeave + user-marked weekOff + holidays + (halfDay * 0.5) + weekOffDuty
   const regularInOffice = Math.max(0, inOffice - weekOffDuty);
-  const totalAllWeekOffs = weekOff + weekOffDuty;
-  const payableDays = regularInOffice + wfh + paidLeave + totalAllWeekOffs + holidays + (halfDay * 0.5) + weekOffDuty;
+  const payableDays = regularInOffice + wfh + paidLeave + weekOff + holidays + (halfDay * 0.5) + (weekOffDuty * 2);
 
   // Overall Attendance Percentage
   const attendanceRate = totalWorkingDays > 0 ? Number(((payableDays / totalWorkingDays) * 100).toFixed(1)) : 0;

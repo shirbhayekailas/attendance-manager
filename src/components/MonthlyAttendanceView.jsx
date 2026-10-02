@@ -235,18 +235,18 @@ export default function MonthlyAttendanceView({
         else if (rec.status === 'absent') absent++;
         else if (rec.status === 'week_off' || rec.status === 'wo') weekOff++;
         else if (rec.status === 'holiday' || rec.status === 'ph') holiday++;
-      } else {
-        if (isSunday) {
-          weekOff++;
-        }
       }
+      // Note: Unmarked Sundays are NOT counted as Week-Off automatically.
+      // Week-Off is only counted when explicitly marked by the user.
+
       if (rec?.overtimeHours) {
         totalOt += Number(rec.overtimeHours) || 0;
       }
     });
 
-    // Enterprise HRMS Standard: Working on Week Off adds +1.0 full day to total payable days
-    const payable = office + wfh + leave + weekOff + holiday + (0.5 * halfDay) + weekOffDuty;
+    // Working on Week Off adds +1.0 full day to total payable days
+    const regularOffice = Math.max(0, office - weekOffDuty);
+    const payable = regularOffice + wfh + leave + weekOff + holiday + (0.5 * halfDay) + (weekOffDuty * 2);
 
     return {
       office,
@@ -280,8 +280,8 @@ export default function MonthlyAttendanceView({
           case 'leave': return 'LV';
           case 'absent': return 'A';
           case 'week_off':
-          case 'wo':
-          case 'weekend': return 'WO';
+          case 'wo': return 'WO';
+          case 'weekend': return '-';
           default: return '-';
         }
       });
