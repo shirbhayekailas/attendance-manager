@@ -5,7 +5,7 @@ import {
   Download,
   Users
 } from 'lucide-react';
-import { calculateEmployeeStats } from '../utils/attendanceCalculations';
+import { calculateMonthlyPayrollStats } from '../utils/attendanceCalculations';
 import { numberToIndianCurrencyWords } from '../utils/numberToWords';
 import { getEmployeeTotalAdvance, getEmployeeTotalExpenses } from '../utils/storage';
 import { sounds } from '../utils/sound';
@@ -30,6 +30,27 @@ export default function BatchSalarySlipsModal({
   }, [isOpen]);
 
   if (!isOpen) return null;
+
+  const parseInitMonthYear = (str) => {
+    try {
+      const parts = String(str || '').trim().split(' ');
+      if (parts.length === 2) {
+        const monthNames = [
+          'january', 'february', 'march', 'april', 'may', 'june',
+          'july', 'august', 'september', 'october', 'november', 'december'
+        ];
+        const mIdx = monthNames.indexOf(parts[0].toLowerCase());
+        const yNum = parseInt(parts[1], 10);
+        if (mIdx !== -1 && !isNaN(yNum)) {
+          return { year: yNum, month: mIdx };
+        }
+      }
+    } catch (e) {}
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  };
+
+  const parsedMY = parseInitMonthYear(monthYear);
 
   const handlePrint = () => {
     sounds.playSuccess();
@@ -96,29 +117,22 @@ export default function BatchSalarySlipsModal({
         <div className="p-4 sm:p-6 overflow-y-auto space-y-8 flex-1">
           {employees.map((employee, index) => {
             const baseMonthly = employee.salaryMonthly || 100000;
-            const stats = calculateEmployeeStats(employee.id, attendance, baseMonthly, 22);
-            const isPfEsic = employee.statutoryType !== 'non_pf_esic';
+            const monthPrefix = `${parsedMY.year}-${String(parsedMY.month + 1).padStart(2, '0')}`;
+            const siteAllowance = getEmployeeTotalExpenses(employee.id, expenses, monthPrefix);
+            const advanceDeduction = getEmployeeTotalAdvance(employee.id, advances) || 0;
 
-            const basic = baseMonthly;
-            const overtimePay = stats.overtimePay || 0;
-            const siteAllowance = getEmployeeTotalExpenses(employee.id, expenses, '2026-09');
-            const grossEarnings = basic + overtimePay + siteAllowance;
+            const payroll = calculateMonthlyPayrollStats({
+              empId: employee.id,
+              attendanceData: attendance,
+              baseSalary: baseMonthly,
+              year: parsedMY.year,
+              month: parsedMY.month,
+              statutoryType: employee.statutoryType || 'standard',
+              siteAllowance,
+              advanceDeduction
+            });
 
-            let epf = 0;
-            let esic = 0;
-            if (isPfEsic) {
-              epf = Math.min(Math.round(basic * 0.12), 1800);
-              if (grossEarnings <= 21000) {
-                esic = Math.round(grossEarnings * 0.0075);
-              }
-            }
-
-            const pt = 200;
-            const lop = stats.lossOfPayDeduction || 0;
-            const advanceDeduction = getEmployeeTotalAdvance(employee.id, advances, '2026-09');
-            const totalDeductions = epf + esic + pt + lop + advanceDeduction;
-            const netPayable = Math.max(0, grossEarnings - totalDeductions);
-            const netInWords = numberToIndianCurrencyWords(netPayable);
+            const netInWords = numberToIndianCurrencyWords(payroll.netPayable);
 
             return (
               <div 
@@ -140,14 +154,14 @@ export default function BatchSalarySlipsModal({
                       {config?.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
                     </p>
                     <p className="text-xs text-slate-900 font-black mt-1 uppercase tracking-wide">
-                      Monthly Salary Disbursement Slip • {monthYear}
+                      Monthly Salary Disbursement Slip • {payroll.monthYearStr}
                     </p>
                   </div>
 
                   <div className="text-right text-xs space-y-0.5">
-                    <p className="font-bold text-slate-900">Payslip #{`PAY-202609-${employee.id}`}</p>
+                    <p className="font-bold text-slate-900">Payslip #{`PAY-${parsedMY.year}${String(parsedMY.month + 1).padStart(2, '0')}-${employee.id}`}</p>
                     <p className="text-slate-600 text-[11px]">Staff Code: {employee.id}</p>
-                    <p className="text-[10px] text-slate-500">Date: 30 Sep 2026</p>
+                    <p className="text-[10px] text-slate-500">Cycle: {payroll.daysInMonth} Days (₹{payroll.perDaySalary}/d)</p>
                   </div>
                 </div>
 
@@ -168,36 +182,40 @@ export default function BatchSalarySlipsModal({
                   <div>
                     <span className="text-[10px] text-slate-400 font-bold uppercase block">Statutory Scheme</span>
                     <span className="font-bold text-blue-700 font-mono text-[11px]">
-                      {isPfEsic ? 'PF & ESIC Applicable' : 'Non-PF & Non-ESIC'}
+                      {payroll.isPfEsic ? 'PF & ESIC Applicable' : 'Non-PF & Non-ESIC'}
                     </span>
                   </div>
                 </div>
 
                 {/* Attendance Summary */}
-                <div className="grid grid-cols-6 divide-x divide-slate-300 border border-slate-300 rounded-xl text-center bg-white py-1.5 text-xs">
+                <div className="grid grid-cols-7 divide-x divide-slate-300 border border-slate-300 rounded-xl text-center bg-white py-1.5 text-xs">
+                  <div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">Month Days</div>
+                    <div className="font-black text-slate-900 text-sm">{payroll.daysInMonth}</div>
+                  </div>
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Payable Days</div>
-                    <div className="font-black text-emerald-600 text-sm">{stats.payableDays}</div>
+                    <div className="font-black text-emerald-600 text-sm">{payroll.payableDays}</div>
                   </div>
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Office / WFH</div>
-                    <div className="font-bold text-slate-800">{stats.inOffice + stats.wfh}</div>
+                    <div className="font-bold text-slate-800">{payroll.inOffice + payroll.wfh}</div>
                   </div>
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Week Off (WO)</div>
-                    <div className="font-bold text-sky-600">{stats.weekOff}</div>
+                    <div className="font-bold text-sky-600">{payroll.weekOff}</div>
                   </div>
                   <div>
-                    <div className="text-[9px] text-slate-500 font-bold uppercase">Paid Leaves</div>
-                    <div className="font-bold text-purple-600">{stats.paidLeave}</div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">Leaves / PH</div>
+                    <div className="font-bold text-purple-600">{payroll.paidLeave + payroll.holidays}</div>
                   </div>
                   <div>
-                    <div className="text-[9px] text-slate-500 font-bold uppercase">Absent (LWP)</div>
-                    <div className="font-bold text-rose-600">{stats.unpaidAbsent}</div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">Absent (LOP)</div>
+                    <div className="font-bold text-rose-600">{payroll.lopDays}</div>
                   </div>
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Overtime</div>
-                    <div className="font-black text-amber-600">{stats.totalOvertimeHours}h</div>
+                    <div className="font-black text-amber-600">{payroll.totalOvertimeHours}h</div>
                   </div>
                 </div>
 
@@ -211,13 +229,21 @@ export default function BatchSalarySlipsModal({
                     </div>
                     <div className="p-3 space-y-1.5">
                       <div className="flex justify-between">
-                        <span className="text-slate-600">Basic Salary</span>
-                        <span className="font-mono font-bold">₹{basic.toLocaleString('en-IN')}</span>
+                        <span className="text-slate-600">Basic CTC Salary</span>
+                        <span className="font-mono font-bold">₹{baseMonthly.toLocaleString('en-IN')}</span>
                       </div>
-                      <div className="flex justify-between text-amber-700 font-bold">
-                        <span>Overtime ({stats.totalOvertimeHours}h @ 1.5x)</span>
-                        <span className="font-mono">₹{overtimePay.toLocaleString('en-IN')}</span>
-                      </div>
+                      {payroll.overtimePay > 0 && (
+                        <div className="flex justify-between text-amber-700 font-bold">
+                          <span>Overtime ({payroll.totalOvertimeHours}h @ 1.5x)</span>
+                          <span className="font-mono">₹{payroll.overtimePay.toLocaleString('en-IN')}</span>
+                        </div>
+                      )}
+                      {payroll.weekOffDutyPay > 0 && (
+                        <div className="flex justify-between text-sky-700 font-bold">
+                          <span>Week Off Duty Extra Pay ({payroll.weekOffDuty}d)</span>
+                          <span className="font-mono">+₹{payroll.weekOffDutyPay.toLocaleString('en-IN')}</span>
+                        </div>
+                      )}
                       {siteAllowance > 0 && (
                         <div className="flex justify-between text-blue-700 font-bold">
                           <span>Site Allowance / Batta</span>
@@ -227,7 +253,7 @@ export default function BatchSalarySlipsModal({
                     </div>
                     <div className="bg-slate-100 border-t border-slate-300 px-3 py-1.5 flex justify-between font-black text-slate-900">
                       <span>GROSS EARNINGS</span>
-                      <span className="font-mono text-emerald-700">₹{grossEarnings.toLocaleString('en-IN')}</span>
+                      <span className="font-mono text-emerald-700">₹{payroll.grossEarnings.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
 
@@ -239,33 +265,33 @@ export default function BatchSalarySlipsModal({
                     </div>
                     <div className="p-3 space-y-1.5">
                       <div className="flex justify-between">
-                        <span className="text-slate-600">Provident Fund (EPF 12%)</span>
-                        <span className="font-mono font-bold">₹{epf.toLocaleString('en-IN')}</span>
+                        <span className="text-slate-600">Provident Fund (EPF {payroll.isPfEsic ? '12%' : 'Exempt'})</span>
+                        <span className="font-mono font-bold">₹{payroll.epf.toLocaleString('en-IN')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">ESIC Contribution</span>
-                        <span className="font-mono font-bold">₹{esic.toLocaleString('en-IN')}</span>
+                        <span className="font-mono font-bold">₹{payroll.esic.toLocaleString('en-IN')}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-600">Professional Tax (PT)</span>
-                        <span className="font-mono font-bold">₹{pt}</span>
+                        <span className="font-mono font-bold">₹{payroll.pt}</span>
                       </div>
-                      {lop > 0 && (
+                      {payroll.lopDays > 0 && (
                         <div className="flex justify-between text-rose-700 font-bold">
-                          <span>Loss of Pay (LOP)</span>
-                          <span className="font-mono">-₹{lop.toLocaleString('en-IN')}</span>
+                          <span>Loss of Pay ({payroll.lopDays}d @ ₹{payroll.perDaySalary}/d)</span>
+                          <span className="font-mono">-₹{payroll.lossOfPayDeduction.toLocaleString('en-IN')}</span>
                         </div>
                       )}
-                      {advanceDeduction > 0 && (
+                      {payroll.advanceDeduction > 0 && (
                         <div className="flex justify-between text-amber-700 font-bold">
                           <span>Salary Advance Recovered</span>
-                          <span className="font-mono">-₹{advanceDeduction.toLocaleString('en-IN')}</span>
+                          <span className="font-mono">-₹{payroll.advanceDeduction.toLocaleString('en-IN')}</span>
                         </div>
                       )}
                     </div>
                     <div className="bg-slate-100 border-t border-slate-300 px-3 py-1.5 flex justify-between font-black text-slate-900">
                       <span>TOTAL DEDUCTIONS</span>
-                      <span className="font-mono text-rose-700">₹{totalDeductions.toLocaleString('en-IN')}</span>
+                      <span className="font-mono text-rose-700">₹{payroll.totalDeductions.toLocaleString('en-IN')}</span>
                     </div>
                   </div>
                 </div>
@@ -278,7 +304,7 @@ export default function BatchSalarySlipsModal({
                   </div>
                   <div className="text-right">
                     <span className="text-xl font-black font-mono text-emerald-400">
-                      ₹{netPayable.toLocaleString('en-IN')}
+                      ₹{payroll.netPayable.toLocaleString('en-IN')}
                     </span>
                   </div>
                 </div>

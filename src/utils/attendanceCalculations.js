@@ -66,7 +66,171 @@ export function calculateWorkDuration(clockIn, clockOut) {
   };
 }
 
-export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 100000, totalCycleDays = 22) {
+export function calculateMonthlyPayrollStats({
+  empId,
+  attendanceData = {},
+  baseSalary = 100000,
+  year = new Date().getFullYear(),
+  month = new Date().getMonth(), // 0-indexed (0 = Jan, 8 = Sep, 9 = Oct)
+  statutoryType = 'pf_esic',
+  siteAllowance = 0,
+  advanceDeduction = 0
+}) {
+  const safeAttendance = attendanceData || {};
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const monthName = new Date(year, month, 1).toLocaleString('default', { month: 'long' });
+
+  // EXACT PER-DAY FORMULA (As requested by user: 30 days -> /30, 31 days -> /31, etc.)
+  const perDaySalary = Math.round((baseSalary / daysInMonth) * 100) / 100;
+  const hourlyRate = Math.round((perDaySalary / 8) * 100) / 100;
+
+  let inOffice = 0;
+  let wfh = 0;
+  let late = 0;
+  let halfDay = 0;
+  let paidLeave = 0;
+  let unpaidAbsent = 0;
+  let weekOff = 0;
+  let holidays = 0;
+  let weekOffDuty = 0; // Worked on a Week Off (WO Duty / Present)
+  let totalOvertimeHours = 0;
+
+  const dayLogs = [];
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${monthPrefix}-${String(d).padStart(2, '0')}`;
+    const dateObj = new Date(year, month, d);
+    const dayOfWeek = dateObj.getDay();
+    const isSunday = dayOfWeek === 0;
+    const rec = safeAttendance[dateStr]?.[empId];
+
+    let status = rec?.status || (isSunday ? 'week_off' : 'none');
+    const ot = (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
+      ? Number(rec.overtimeHours)
+      : ((rec?.clockIn && rec?.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--')
+        ? calculateWorkDuration(rec.clockIn, rec.clockOut).overtimeHours
+        : 0);
+
+    totalOvertimeHours += ot;
+
+    if (rec && rec.status) {
+      status = rec.status;
+      if (status === 'present') {
+        inOffice++;
+        if (isSunday || rec.isWeekOffDuty || /week.?off|sunday|wo/i.test(rec.note || '')) {
+          weekOffDuty++;
+        }
+      } else if (status === 'wfh') {
+        wfh++;
+      } else if (status === 'late') {
+        inOffice++;
+        late++;
+      } else if (status === 'half_day') {
+        halfDay++;
+      } else if (status === 'leave') {
+        paidLeave++;
+      } else if (status === 'absent') {
+        unpaidAbsent++;
+      } else if (status === 'week_off' || status === 'wo') {
+        weekOff++;
+      } else if (status === 'holiday' || status === 'ph') {
+        holidays++;
+      } else if (status === 'week_off_present' || status === 'wo_present') {
+        inOffice++;
+        weekOffDuty++;
+      }
+    } else {
+      if (isSunday) {
+        weekOff++;
+      } else {
+        const todayStr = new Date().toISOString().split('T')[0];
+        if (dateStr <= todayStr) {
+          unpaidAbsent++;
+        }
+      }
+    }
+
+    dayLogs.push({
+      day: d,
+      dateStr,
+      weekday: dateObj.toLocaleDateString(undefined, { weekday: 'short' }),
+      status,
+      overtimeHours: ot,
+      clockIn: rec?.clockIn || '--',
+      clockOut: rec?.clockOut || '--',
+    });
+  }
+
+  // Total payable days in month cannot exceed total calendar days
+  const payableDays = Math.min(daysInMonth, inOffice + wfh + paidLeave + weekOff + holidays + (halfDay * 0.5));
+  const lopDays = Math.max(0, daysInMonth - payableDays);
+
+  const lossOfPayDeduction = Math.round(lopDays * perDaySalary);
+  const earnedBasic = Math.max(0, Math.round(baseSalary - lossOfPayDeduction));
+  const overtimePay = Math.round(totalOvertimeHours * hourlyRate * 1.5);
+  const weekOffDutyPay = Math.round(weekOffDuty * perDaySalary); // Extra day pay if worked on Week Off
+
+  const grossEarnings = baseSalary + overtimePay + weekOffDutyPay + (Number(siteAllowance) || 0);
+
+  // Statutory Deductions
+  const isPfEsic = statutoryType !== 'non_pf_esic';
+  let epf = 0;
+  let esic = 0;
+  if (isPfEsic) {
+    epf = Math.min(Math.round(earnedBasic * 0.12), 1800);
+    if (grossEarnings <= 21000) {
+      esic = Math.round(grossEarnings * 0.0075);
+    }
+  }
+
+  const pt = 200;
+  const taxableSalary = Math.max(0, grossEarnings - (isPfEsic ? earnedBasic * 0.12 : 0) - 40000);
+  const tds = taxableSalary > 30000 ? Math.round(taxableSalary * 0.05) : 0;
+  const advances = Number(advanceDeduction) || 0;
+
+  const totalDeductions = epf + esic + pt + tds + advances + lossOfPayDeduction;
+  const netPayable = Math.max(0, grossEarnings - totalDeductions);
+
+  return {
+    year,
+    month,
+    monthName,
+    monthYearStr: `${monthName} ${year}`,
+    daysInMonth,
+    perDaySalary,
+    hourlyRate,
+    inOffice,
+    wfh,
+    late,
+    halfDay,
+    paidLeave,
+    unpaidAbsent: lopDays,
+    weekOff,
+    holidays,
+    weekOffDuty,
+    totalOvertimeHours: Number(totalOvertimeHours.toFixed(1)),
+    payableDays,
+    lopDays,
+    baseSalary,
+    earnedBasic,
+    overtimePay,
+    weekOffDutyPay,
+    siteAllowance: Number(siteAllowance) || 0,
+    grossEarnings,
+    epf,
+    esic,
+    pt,
+    tds,
+    advanceDeduction: advances,
+    lossOfPayDeduction,
+    totalDeductions,
+    netPayable,
+    dayLogs,
+  };
+}
+
+export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 100000, totalCycleDays = null) {
   const safeAttendance = attendanceData || {};
   const dates = Object.keys(safeAttendance).sort();
   let totalWorkingDays = 0;
@@ -78,6 +242,7 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
   let unpaidAbsent = 0;
   let weekOff = 0;
   let holidays = 0;
+  let weekOffDuty = 0;
   let totalOvertimeHours = 0;
 
   const logs = [];
@@ -99,7 +264,12 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
         : (actualDuration ? actualDuration.overtimeHours : 0);
       totalOvertimeHours += ot;
 
-      if (status === "present") inOffice++;
+      if (status === "present") {
+        inOffice++;
+        if (record.isWeekOffDuty || /week.?off|sunday|wo/i.test(record.note || '')) {
+          weekOffDuty++;
+        }
+      }
       else if (status === "wfh") wfh++;
       else if (status === "late") {
         inOffice++;
@@ -109,6 +279,10 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
       else if (status === "absent") unpaidAbsent++;
       else if (status === "week_off" || status === "wo") weekOff++;
       else if (status === "holiday" || status === "ph") holidays++;
+      else if (status === "week_off_present" || status === "wo_present") {
+        inOffice++;
+        weekOffDuty++;
+      }
 
       logs.push({
         date,
@@ -133,19 +307,21 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
   const onTimeDays = Math.max(0, totalInPersonDays - late);
   const punctualityRate = totalInPersonDays > 0 ? Number(((onTimeDays / totalInPersonDays) * 100).toFixed(1)) : 100;
 
-  // Financial Payroll Calculation
-  const standardMonthDays = totalCycleDays || 22;
-  const perDaySalary = Math.round(baseSalary / standardMonthDays);
-  const hourlyRate = Math.round(perDaySalary / 8);
-  const overtimePay = Math.round(totalOvertimeHours * hourlyRate * 1.5); // 1.5x Overtime rate
+  // Financial Payroll Calculation: dynamically calculate days in current month if totalCycleDays not specified
+  const currentMonthDays = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+  const standardMonthDays = (typeof totalCycleDays === 'number' && totalCycleDays > 0) ? totalCycleDays : currentMonthDays;
+  const perDaySalary = Math.round((baseSalary / standardMonthDays) * 100) / 100;
+  const hourlyRate = Math.round((perDaySalary / 8) * 100) / 100;
+  const overtimePay = Math.round(totalOvertimeHours * hourlyRate * 1.5);
+  const weekOffDutyPay = Math.round(weekOffDuty * perDaySalary);
   const lossOfPayDeduction = Math.round(unpaidAbsent * perDaySalary);
-  const netEstimatedSalary = Math.max(0, Math.round((payableDays * perDaySalary) + overtimePay));
+  const netEstimatedSalary = Math.max(0, Math.round((payableDays * perDaySalary) + overtimePay + weekOffDutyPay));
 
   // Streak
   let activeStreak = 0;
   for (let i = logs.length - 1; i >= 0; i--) {
     const st = logs[i].status;
-    if (st === "present" || st === "wfh" || st === "late") {
+    if (st === "present" || st === "wfh" || st === "late" || st === "week_off_present") {
       activeStreak++;
     } else {
       break;
@@ -162,6 +338,7 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
     unpaidAbsent,
     weekOff,
     holidays,
+    weekOffDuty,
     totalOvertimeHours: Number(totalOvertimeHours.toFixed(1)),
     payableDays,
     attendanceRate,
@@ -169,6 +346,7 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
     activeStreak,
     perDaySalary,
     overtimePay,
+    weekOffDutyPay,
     lossOfPayDeduction,
     netEstimatedSalary,
     historyList: logs.reverse(),

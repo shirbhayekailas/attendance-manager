@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Printer, 
@@ -6,16 +6,17 @@ import {
   FileText,
   CheckCircle2,
   MessageCircle,
-  Share2
+  Share2,
+  Calendar
 } from 'lucide-react';
-import { calculateEmployeeStats } from '../utils/attendanceCalculations';
+import { calculateMonthlyPayrollStats } from '../utils/attendanceCalculations';
 import { numberToIndianCurrencyWords } from '../utils/numberToWords';
 import { sounds } from '../utils/sound';
 import { getEmployeeTotalAdvance, getEmployeeTotalExpenses } from '../utils/storage';
 
 export default function SalarySlipModal({ 
   employee, 
-  attendance, 
+  attendance = {}, 
   advances = [],
   expenses = [],
   config = {}, 
@@ -29,48 +30,56 @@ export default function SalarySlipModal({
     };
   }, []);
 
+  // Helper to parse default initial month & year
+  const parseInitMonthYear = (str) => {
+    try {
+      const parts = String(str || '').trim().split(' ');
+      if (parts.length === 2) {
+        const monthNames = [
+          'january', 'february', 'march', 'april', 'may', 'june',
+          'july', 'august', 'september', 'october', 'november', 'december'
+        ];
+        const mIdx = monthNames.indexOf(parts[0].toLowerCase());
+        const yNum = parseInt(parts[1], 10);
+        if (mIdx !== -1 && !isNaN(yNum)) {
+          return { year: yNum, month: mIdx };
+        }
+      }
+    } catch (e) {}
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  };
+
+  const initial = parseInitMonthYear(monthYear);
+  const [selectedYear, setSelectedYear] = useState(initial.year);
+  const [selectedMonth, setSelectedMonth] = useState(initial.month);
+
   if (!employee) return null;
 
   const baseMonthly = employee.salaryMonthly || parseInt(String(employee.salaryBase || '100000').replace(/[^0-9]/g, ''), 10) || 100000;
-  const stats = calculateEmployeeStats(employee.id, attendance, baseMonthly, 22);
+  const monthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+  
+  const siteAllowance = getEmployeeTotalExpenses(employee.id, expenses, monthPrefix);
+  const advanceDeduction = getEmployeeTotalAdvance(employee.id, advances) || employee.salaryAdvance || 0;
+
+  // Exact per-day payroll calculation (divide by 30 if 30 days, by 31 if 31 days, by 28/29 if Feb)
+  const payroll = calculateMonthlyPayrollStats({
+    empId: employee.id,
+    attendanceData: attendance,
+    baseSalary: baseMonthly,
+    year: selectedYear,
+    month: selectedMonth,
+    statutoryType: employee.statutoryType || 'standard',
+    siteAllowance,
+    advanceDeduction
+  });
 
   const isPfEsic = employee.statutoryType !== 'non_pf_esic';
+  const netInWords = numberToIndianCurrencyWords(payroll.netPayable);
 
-  // Corporate Salary Structure - Base Salary and Basic Salary are ONE AND THE SAME (100%)
-  const basic = baseMonthly;
-  const overtimePay = stats.overtimePay || 0;
-  const siteAllowance = getEmployeeTotalExpenses(employee.id, expenses, '2026-09');
-  const performanceBonus = 0;
-
-  const grossEarnings = basic + overtimePay + siteAllowance + performanceBonus;
-
-  // Deductions as per Statutory Option (PF & ESIC vs Non-PF / Non-ESIC)
-  let epf = 0;
-  let esic = 0;
-
-  if (isPfEsic) {
-    // 12% of Basic, standard statutory cap of ₹1,800/mo
-    epf = Math.min(Math.round(basic * 0.12), 1800);
-    // ESIC 0.75% of Gross if gross <= ₹21,000 statutory limit
-    if (grossEarnings <= 21000) {
-      esic = Math.round(grossEarnings * 0.0075);
-    } else {
-      esic = 0;
-    }
-  }
-
-  const pt = 200;
-  const lop = stats.lossOfPayDeduction || 0;
-  const advanceDeduction = getEmployeeTotalAdvance(employee.id, advances) || employee.salaryAdvance || 0;
-  const taxableSalary = Math.max(0, grossEarnings - (isPfEsic ? basic * 0.12 : 0) - 40000);
-  const tds = taxableSalary > 30000 ? Math.round(taxableSalary * 0.05) : 0;
-
-  const totalDeductions = epf + esic + pt + lop + tds + advanceDeduction;
-  const netPayable = Math.max(0, grossEarnings - totalDeductions);
-  const netInWords = numberToIndianCurrencyWords(netPayable);
-
-  const payslipRef = `PAY-202609-${employee.id.replace(/[^a-zA-Z0-9]/g, '')}`;
-  const paymentDate = '30 Sep 2026';
+  const payslipRef = `PAY-${selectedYear}${String(selectedMonth + 1).padStart(2, '0')}-${employee.id.replace(/[^a-zA-Z0-9]/g, '')}`;
+  const lastDayDate = new Date(selectedYear, selectedMonth + 1, 0);
+  const paymentDate = `${lastDayDate.getDate()} ${payroll.monthName.slice(0, 3)} ${selectedYear}`;
 
   const handlePrint = () => {
     sounds.playSuccess();
@@ -81,29 +90,30 @@ export default function SalarySlipModal({
     sounds.playSuccess();
     const phone = (employee.phone || '').replace(/[^0-9]/g, '');
     const cleanPhone = phone.length === 10 ? `91${phone}` : phone;
-    const msg = `*SALARY PAYSLIP - ${monthYear.toUpperCase()}*
+    const msg = `*SALARY PAYSLIP - ${payroll.monthYearStr.toUpperCase()}*
 *SK ENTERPRISES*
 303, Panchsheel CHS Ltd, Plot No 07, Sec -02, Taloja Phase -01, Navi Mumbai - 410208
 
 Employee: *${employee.name}* (${employee.id})
 Designation: ${employee.role} | Dept: ${employee.department}
 
-*Attendance Summary:*
-- Present: ${stats.inOffice + stats.wfh} Days
-- Week Off (WO): ${stats.weekOff || 0} Days
-- Paid Leave / Holiday: ${(stats.paidLeave || 0) + (stats.holidays || 0)} Days
-- Overtime: ${stats.totalOvertimeHours} hrs
-
+*Attendance & Daily Rate Formula:*
+- Month Days: ${payroll.daysInMonth} Days
+- Daily Rate: ₹${payroll.perDaySalary}/day (₹${baseMonthly.toLocaleString('en-IN')} ÷ ${payroll.daysInMonth}d)
+- Present / WFH: ${payroll.inOffice + payroll.wfh} Days
+- Paid Week Off (WO): ${payroll.weekOff} Days
+- Paid Leaves / Holidays: ${payroll.paidLeave + payroll.holidays} Days
+- Total Payable Days: ${payroll.payableDays} / ${payroll.daysInMonth}
+${payroll.lopDays > 0 ? `- Loss of Pay (LOP): ${payroll.lopDays} Days (-₹${payroll.lossOfPayDeduction.toLocaleString('en-IN')})\n` : ''}${payroll.totalOvertimeHours > 0 ? `- Overtime: ${payroll.totalOvertimeHours} hrs (+₹${payroll.overtimePay.toLocaleString('en-IN')})\n` : ''}${payroll.weekOffDuty > 0 ? `- Week Off Duty Extra Pay: ${payroll.weekOffDuty} days (+₹${payroll.weekOffDutyPay.toLocaleString('en-IN')})\n` : ''}
 *Earnings Breakdown:*
-- Basic Salary: ₹${basic.toLocaleString('en-IN')}
-- Overtime Pay: ₹${overtimePay.toLocaleString('en-IN')}${siteAllowance > 0 ? `\n- Site Allowance / Batta: ₹${siteAllowance.toLocaleString('en-IN')}` : ''}
-*Gross Earnings: ₹${grossEarnings.toLocaleString('en-IN')}*
+- Basic CTC Salary: ₹${baseMonthly.toLocaleString('en-IN')}
+${payroll.overtimePay > 0 ? `- Overtime Pay: ₹${payroll.overtimePay.toLocaleString('en-IN')}\n` : ''}${payroll.weekOffDutyPay > 0 ? `- Week Off Duty Pay: ₹${payroll.weekOffDutyPay.toLocaleString('en-IN')}\n` : ''}${siteAllowance > 0 ? `- Site Allowance / Batta: ₹${siteAllowance.toLocaleString('en-IN')}\n` : ''}*Gross Earnings: ₹${payroll.grossEarnings.toLocaleString('en-IN')}*
 
 *Deductions:*
-${isPfEsic ? `- EPF (12%): ₹${epf.toLocaleString('en-IN')}\n` : ''}${isPfEsic && esic > 0 ? `- ESIC (0.75%): ₹${esic.toLocaleString('en-IN')}\n` : ''}- Prof. Tax (PT): ₹${pt.toLocaleString('en-IN')}
-${lop > 0 ? `- Loss of Pay (LOP): ₹${lop.toLocaleString('en-IN')}\n` : ''}${advanceDeduction > 0 ? `- Advance Deducted: ₹${advanceDeduction.toLocaleString('en-IN')}\n` : ''}- Total Deductions: ₹${totalDeductions.toLocaleString('en-IN')}
+${isPfEsic ? `- EPF (12%): ₹${payroll.epf.toLocaleString('en-IN')}\n` : ''}${isPfEsic && payroll.esic > 0 ? `- ESIC (0.75%): ₹${payroll.esic.toLocaleString('en-IN')}\n` : ''}- Prof. Tax (PT): ₹${payroll.pt.toLocaleString('en-IN')}
+${payroll.lossOfPayDeduction > 0 ? `- Loss of Pay (LOP): ₹${payroll.lossOfPayDeduction.toLocaleString('en-IN')}\n` : ''}${payroll.advanceDeduction > 0 ? `- Advance Deducted: ₹${payroll.advanceDeduction.toLocaleString('en-IN')}\n` : ''}- Total Deductions: ₹${payroll.totalDeductions.toLocaleString('en-IN')}
 
-*Net Payable Salary: ₹${netPayable.toLocaleString('en-IN')}*
+*Net Payable Salary: ₹${payroll.netPayable.toLocaleString('en-IN')}*
 In Words: ${netInWords}
 Ref: ${payslipRef}
 
@@ -118,7 +128,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
   return (
     <div className="print-modal-overlay fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
       
-      {/* Print Specific CSS Override to Guarantee Single-Page A4 Setup & 100% Clean Render */}
+      {/* Print Specific CSS Override to Guarantee Single-Page A4 Setup */}
       <style>{`
         @media print {
           @page {
@@ -148,55 +158,42 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             padding: 0 !important;
             overflow: visible !important;
             overflow-x: visible !important;
-            overflow-y: visible !important;
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
-          body > *:not(#root) {
+          #root {
             display: none !important;
-            visibility: hidden !important;
-            position: absolute !important;
-            left: -99999px !important;
           }
           .print-modal-overlay {
-            position: static !important;
-            display: block !important;
+            position: absolute !important;
+            inset: 0 !important;
             width: 100% !important;
-            max-width: 100% !important;
             height: auto !important;
-            margin: 0 !important;
+            background: #ffffff !important;
             padding: 0 !important;
-            background: transparent !important;
-            box-shadow: none !important;
-            border: none !important;
+            margin: 0 !important;
             overflow: visible !important;
-            overflow-x: visible !important;
-            overflow-y: visible !important;
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
-            inset: auto !important;
-            z-index: auto !important;
+            display: block !important;
+            z-index: 9999 !important;
           }
           .print-modal-body {
-            position: static !important;
-            display: block !important;
-            width: 100% !important;
             max-width: 100% !important;
-            margin: 0 !important;
+            width: 100% !important;
+            border: none !important;
+            box-shadow: none !important;
             padding: 0 !important;
+            margin: 0 !important;
+            overflow: visible !important;
             background: #ffffff !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .printable-document {
             box-shadow: none !important;
             border: none !important;
-            border-radius: 0 !important;
-            overflow: visible !important;
-            overflow-x: visible !important;
-            overflow-y: visible !important;
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
-          }
-          .salary-slip-page {
+            width: 100% !important;
             page-break-inside: avoid !important;
-            break-inside: avoid !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
             max-height: 100% !important;
@@ -211,36 +208,61 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
       <div className="print-modal-body bg-white dark:bg-slate-900 w-full max-w-4xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 my-auto overflow-hidden">
         
         {/* On-screen Action Toolbar (Hidden during print) */}
-        <div className="no-print flex items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80">
+        <div className="no-print flex flex-wrap items-center justify-between px-5 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/80 gap-3">
           <div className="flex items-center gap-2">
             <div className="w-7 h-7 rounded-lg bg-blue-600/10 text-blue-600 flex items-center justify-center font-bold">
               <FileText className="w-4 h-4" />
             </div>
             <div>
               <h3 className="text-xs font-black text-slate-900 dark:text-white">
-                Official Salary Payslip Statement (A4 Single-Page Format)
+                Official Salary Statement • {employee.name} ({employee.id})
               </h3>
-              <p className="text-[10px] text-slate-500">
-                {employee.name} ({employee.id}) • {monthYear}
+              <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
+                Per-Day Formula: ₹{baseMonthly.toLocaleString('en-IN')} ÷ {payroll.daysInMonth}d = ₹{payroll.perDaySalary}/day
               </p>
             </div>
           </div>
 
+          {/* Month / Year Quick Switcher */}
           <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 p-1 px-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
+              <Calendar className="w-3.5 h-3.5 text-slate-400" />
+              <select
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                className="text-xs font-bold bg-transparent text-slate-900 dark:text-white focus:outline-none cursor-pointer"
+              >
+                {Array.from({ length: 12 }, (_, i) => {
+                  const mName = new Date(selectedYear, i, 1).toLocaleString('default', { month: 'short' });
+                  return <option key={i} value={i}>{mName}</option>;
+                })}
+              </select>
+
+              <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="text-xs font-bold bg-transparent text-slate-900 dark:text-white focus:outline-none cursor-pointer ml-1"
+              >
+                {[2025, 2026, 2027].map(yr => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+            </div>
+
             <button
               onClick={handleShareWhatsApp}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all"
               title="Share Salary Slip on WhatsApp"
             >
               <MessageCircle className="w-3.5 h-3.5" />
-              <span>WhatsApp Slip</span>
+              <span className="hidden sm:inline">WhatsApp</span>
             </button>
             <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/25 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/25 transition-all"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print / Save PDF (A4)</span>
+              <span>Print A4</span>
             </button>
             <button
               onClick={onClose}
@@ -279,7 +301,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                   SALARY PAYSLIP
                 </div>
                 <div className="text-[11px] font-bold text-slate-900">
-                  Pay Period: <span className="font-black text-blue-700 uppercase">{monthYear}</span>
+                  Pay Period: <span className="font-black text-blue-700 uppercase">{payroll.monthYearStr}</span>
                 </div>
                 <div className="text-[9.5px] text-slate-500 font-mono">
                   Ref No: <span className="font-bold text-slate-800">{payslipRef}</span>
@@ -334,7 +356,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                 <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">
                   {isPfEsic ? 'PF / UAN & ESIC No' : 'Statutory Status'}
                 </span>
-                <span className="font-mono font-bold text-slate-800 block truncate" title={isPfEsic ? (employee.uanNo || `1014892019${employee.id.replace(/\D/g, '') || '28'}`) : 'Non-PF & Non-ESIC'}>
+                <span className="font-mono font-bold text-slate-800 block truncate">
                   {isPfEsic 
                     ? `${employee.uanNo || `1014892019${employee.id.replace(/\D/g, '') || '28'}`}${employee.esicNo ? ` • ESIC: ${employee.esicNo}` : ''}`
                     : 'EXEMPT (Non-PF & Non-ESIC)'
@@ -344,40 +366,42 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             </div>
           </div>
 
-          {/* Monthly Attendance Summary Metrics Bar */}
+          {/* Monthly Attendance Summary Metrics Bar (Dynamic Days in Month formula) */}
           <div className="border border-slate-300 rounded-lg overflow-hidden text-[10px] mb-2.5">
             <div className="bg-slate-100 font-black text-slate-800 px-3 py-0.5 border-b border-slate-300 uppercase tracking-wide text-[8.5px] flex items-center justify-between">
-              <span>Attendance &amp; Shift Records for {monthYear}</span>
-              <span className="text-slate-500 font-normal">Base Cycle: 22 Working Days</span>
+              <span>Attendance &amp; Shift Records for {payroll.monthYearStr}</span>
+              <span className="text-blue-700 font-bold">
+                Formula: ₹{baseMonthly.toLocaleString('en-IN')} ÷ {payroll.daysInMonth}d = ₹{payroll.perDaySalary.toLocaleString('en-IN')}/day
+              </span>
             </div>
             <div className="grid grid-cols-7 divide-x divide-slate-300 text-center bg-white py-1">
               <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Calendar Days</div>
-                <div className="text-xs font-black text-slate-900">30</div>
+                <div className="text-xs font-black text-slate-900">{payroll.daysInMonth}</div>
               </div>
               <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Present / WFH</div>
-                <div className="text-xs font-black text-emerald-600">{stats.inOffice + stats.wfh}</div>
+                <div className="text-xs font-black text-emerald-600">{payroll.inOffice + payroll.wfh}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Week Off (WO)</div>
-                <div className="text-xs font-black text-sky-600">{stats.weekOff || 0}</div>
+                <div className="text-[8px] text-slate-500 font-medium">Paid Week Off</div>
+                <div className="text-xs font-black text-sky-600">{payroll.weekOff}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Approved Leaves</div>
-                <div className="text-xs font-black text-blue-600">{stats.paidLeave}</div>
+                <div className="text-[8px] text-slate-500 font-medium">Paid Leaves / PH</div>
+                <div className="text-xs font-black text-blue-600">{payroll.paidLeave + payroll.holidays}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Half Days</div>
-                <div className="text-xs font-black text-amber-600">{stats.halfDay}</div>
+                <div className="text-[8px] text-slate-500 font-medium">Payable Days</div>
+                <div className="text-xs font-black text-emerald-700 bg-emerald-50 rounded">{payroll.payableDays}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Absent (LOP)</div>
-                <div className="text-xs font-black text-rose-600">{stats.unpaidAbsent}</div>
+                <div className="text-[8px] text-slate-500 font-medium">Loss of Pay (LOP)</div>
+                <div className="text-xs font-black text-rose-600">{payroll.lopDays}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Overtime Logged</div>
-                <div className="text-xs font-black text-purple-600">{stats.totalOvertimeHours} hrs</div>
+                <div className="text-[8px] text-slate-500 font-medium">Overtime</div>
+                <div className="text-xs font-black text-purple-600">{payroll.totalOvertimeHours} hrs</div>
               </div>
             </div>
           </div>
@@ -394,13 +418,21 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                 </div>
                 <div className="divide-y divide-slate-100">
                   <div className="px-3 py-1 flex justify-between">
-                    <span className="text-slate-600">Basic Salary</span>
-                    <span className="font-mono font-bold text-slate-900">₹{basic.toLocaleString('en-IN')}</span>
+                    <span className="text-slate-600">Basic CTC Salary (Base)</span>
+                    <span className="font-mono font-bold text-slate-900">₹{baseMonthly.toLocaleString('en-IN')}</span>
                   </div>
-                  <div className="px-3 py-1 flex justify-between bg-purple-50/40">
-                    <span className="text-purple-900 font-medium">Overtime ({stats.totalOvertimeHours}h @ 1.5x)</span>
-                    <span className="font-mono font-bold text-purple-700">₹{overtimePay.toLocaleString('en-IN')}</span>
-                  </div>
+                  {payroll.overtimePay > 0 && (
+                    <div className="px-3 py-1 flex justify-between bg-purple-50/40">
+                      <span className="text-purple-900 font-medium">Overtime Pay ({payroll.totalOvertimeHours}h @ 1.5x)</span>
+                      <span className="font-mono font-bold text-purple-700">₹{payroll.overtimePay.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
+                  {payroll.weekOffDutyPay > 0 && (
+                    <div className="px-3 py-1 flex justify-between bg-sky-50/60">
+                      <span className="text-sky-950 font-medium">Week Off Duty Extra Pay ({payroll.weekOffDuty}d @ ₹{payroll.perDaySalary}/d)</span>
+                      <span className="font-mono font-bold text-sky-700">₹{payroll.weekOffDutyPay.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                   {siteAllowance > 0 && (
                     <div className="px-3 py-1 flex justify-between bg-amber-50/50">
                       <span className="text-amber-900 font-medium">Site Allowance / Batta</span>
@@ -426,7 +458,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                 </div>
                 <div className="bg-slate-100 border-t border-slate-300 px-3 py-1.5 flex justify-between font-black text-slate-900">
                   <span>GROSS EARNINGS (A)</span>
-                  <span className="font-mono text-xs text-emerald-700">₹{grossEarnings.toLocaleString('en-IN')}</span>
+                  <span className="font-mono text-xs text-emerald-700">₹{payroll.grossEarnings.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
@@ -438,39 +470,50 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                 </div>
                 <div className="divide-y divide-slate-100">
                   <div className="px-3 py-1 flex justify-between">
-                    <span className="text-slate-600">Employee Provident Fund (EPF {isPfEsic ? '12%' : 'Exempt'})</span>
+                    <span className="text-slate-600">Employee Provident Fund (EPF {payroll.isPfEsic ? '12%' : 'Exempt'})</span>
                     <span className="font-mono font-bold text-slate-900">
-                      {isPfEsic ? `₹${epf.toLocaleString('en-IN')}` : '₹0 (Exempt)'}
+                      {payroll.isPfEsic ? `₹${payroll.epf.toLocaleString('en-IN')}` : '₹0 (Exempt)'}
                     </span>
                   </div>
                   <div className="px-3 py-1 flex justify-between">
-                    <span className="text-slate-600">Employee State Insurance (ESIC {isPfEsic ? '0.75%' : 'Exempt'})</span>
+                    <span className="text-slate-600">Employee State Insurance (ESIC {payroll.isPfEsic ? '0.75%' : 'Exempt'})</span>
                     <span className="font-mono font-bold text-slate-900">
-                      {isPfEsic 
-                        ? (esic > 0 ? `₹${esic.toLocaleString('en-IN')}` : '₹0 (Gross > ₹21k)') 
+                      {payroll.isPfEsic 
+                        ? (payroll.esic > 0 ? `₹${payroll.esic.toLocaleString('en-IN')}` : '₹0 (Gross > ₹21k)') 
                         : '₹0 (Exempt)'}
                     </span>
                   </div>
                   <div className="px-3 py-1 flex justify-between">
                     <span className="text-slate-600">Professional Tax (PT)</span>
-                    <span className="font-mono font-bold text-slate-900">₹{pt.toLocaleString('en-IN')}</span>
+                    <span className="font-mono font-bold text-slate-900">₹{payroll.pt.toLocaleString('en-IN')}</span>
                   </div>
                   <div className="px-3 py-1 flex justify-between">
                     <span className="text-slate-600">Tax Deducted at Source (TDS)</span>
-                    <span className="font-mono font-bold text-slate-900">₹{tds.toLocaleString('en-IN')}</span>
+                    <span className="font-mono font-bold text-slate-900">₹{payroll.tds.toLocaleString('en-IN')}</span>
                   </div>
-                  <div className="px-3 py-1 flex justify-between bg-rose-50/40">
-                    <span className="text-rose-900 font-medium">Loss of Pay ({stats.unpaidAbsent}d LOP)</span>
-                    <span className="font-mono font-bold text-rose-700">₹{lop.toLocaleString('en-IN')}</span>
-                  </div>
-                  <div className="px-3 py-1 flex justify-between bg-amber-50/50">
-                    <span className="text-amber-950 font-medium">Salary Advance Deduction</span>
-                    <span className="font-mono font-bold text-amber-700">₹{advanceDeduction.toLocaleString('en-IN')}</span>
-                  </div>
+                  {payroll.lopDays > 0 ? (
+                    <div className="px-3 py-1 flex justify-between bg-rose-50/50">
+                      <span className="text-rose-900 font-bold">
+                        Loss of Pay ({payroll.lopDays}d @ ₹{payroll.perDaySalary}/d)
+                      </span>
+                      <span className="font-mono font-bold text-rose-700">₹{payroll.lossOfPayDeduction.toLocaleString('en-IN')}</span>
+                    </div>
+                  ) : (
+                    <div className="px-3 py-1 flex justify-between">
+                      <span className="text-slate-500">Loss of Pay (0 LOP)</span>
+                      <span className="font-mono text-slate-400">₹0</span>
+                    </div>
+                  )}
+                  {payroll.advanceDeduction > 0 && (
+                    <div className="px-3 py-1 flex justify-between bg-amber-50/50">
+                      <span className="text-amber-950 font-medium">Salary Advance Deduction</span>
+                      <span className="font-mono font-bold text-amber-700">₹{payroll.advanceDeduction.toLocaleString('en-IN')}</span>
+                    </div>
+                  )}
                 </div>
                 <div className="bg-slate-100 border-t border-slate-300 px-3 py-1.5 flex justify-between font-black text-slate-900">
                   <span>TOTAL DEDUCTIONS (B)</span>
-                  <span className="font-mono text-xs text-rose-700">₹{totalDeductions.toLocaleString('en-IN')}</span>
+                  <span className="font-mono text-xs text-rose-700">₹{payroll.totalDeductions.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
@@ -484,7 +527,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                 NET SALARY PAYABLE (Gross A - Deductions B)
               </span>
               <div className="text-2xl font-black font-mono tracking-tight text-white leading-tight">
-                ₹{netPayable.toLocaleString('en-IN')}
+                ₹{payroll.netPayable.toLocaleString('en-IN')}
               </div>
               <div className="text-[10px] font-semibold text-slate-300 italic">
                 In Words: <span className="font-bold text-white not-italic">{netInWords}</span>
@@ -509,16 +552,16 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           <div className="p-2 px-3 rounded-lg bg-slate-50 border border-slate-200 text-[8.5px] text-slate-500 leading-snug mb-3">
             <p className="font-semibold text-slate-700 mb-0.5">Statutory &amp; Payroll Compliance Declaration:</p>
             <p>
-              1. This statement is an official computer-generated payslip issued under the Corporate HR &amp; Payroll regulations of {config.companyName || 'SK ENTERPRISES'}. No physical signature is required.
+              1. This statement is an official computer-generated payslip issued under the Corporate HR &amp; Payroll regulations of {config.companyName || 'SK ENTERPRISES'}. Daily salary calculation: Base CTC divided by total calendar days ({payroll.daysInMonth} days).
             </p>
             <p>
               {isPfEsic 
                 ? '2. Statutory contributions (EPF @ 12% capped at ₹1,800/mo & ESIC @ 0.75% for gross ≤ ₹21,000) have been computed and deposited under statutory compliance codes.'
                 : '2. Employee is enrolled under the Non-PF & Non-ESIC category as per statutory exemption declaration. Gross pay disbursed without statutory deductions.'}
             </p>
-            {advanceDeduction > 0 && (
+            {payroll.advanceDeduction > 0 && (
               <p className="text-amber-700 dark:text-amber-400 font-semibold mt-0.5">
-                3. Total salary advance of ₹{advanceDeduction.toLocaleString('en-IN')} disbursed in this pay cycle has been recovered and deducted from net salary.
+                3. Total salary advance of ₹{payroll.advanceDeduction.toLocaleString('en-IN')} disbursed in this pay cycle has been recovered and deducted from net salary.
               </p>
             )}
           </div>

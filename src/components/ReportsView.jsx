@@ -47,6 +47,12 @@ export default function ReportsView({
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseTargetEmp, setExpenseTargetEmp] = useState(null);
 
+  const now = new Date();
+  const currentMonthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthName = now.toLocaleString('default', { month: 'long' });
+  const currentYear = now.getFullYear();
+
   const allDates = Object.keys(attendance).sort();
   const filteredDates = rangeFilter === 'all' 
     ? allDates 
@@ -87,13 +93,17 @@ export default function ReportsView({
         else if (rec.status === 'absent') rangeAbsent++;
         else if (rec.status === 'week_off' || rec.status === 'wo') rangeWeekOff++;
         else if (rec.status === 'holiday' || rec.status === 'ph') rangeHoliday++;
+        else if (rec.status === 'week_off_present' || rec.status === 'wo_present') {
+          rangeOffice++;
+        }
       }
     });
 
     const payableDays = rangeOffice + rangeWFH + rangeLeave + rangeWeekOff + rangeHoliday + (rangeHalfDay * 0.5);
-    const overallStats = calculateEmployeeStats(emp.id, attendance, emp.salaryMonthly || 100000, 22);
+    // Dynamic month days division: 30 for 30d month, 31 for 31d month, etc.
+    const overallStats = calculateEmployeeStats(emp.id, attendance, emp.salaryMonthly || 100000, currentMonthDays);
     const advanceAmount = getEmployeeTotalAdvance(emp.id, advances);
-    const siteAllowance = getEmployeeTotalExpenses(emp.id, expenses, '2026-09');
+    const siteAllowance = getEmployeeTotalExpenses(emp.id, expenses, currentMonthPrefix);
     const netDisbursal = Math.max(0, overallStats.netEstimatedSalary + siteAllowance - advanceAmount);
 
     return {
@@ -205,7 +215,7 @@ export default function ReportsView({
       `"${e.ifscCode || 'HDFC0000123'}"`,
       e.netDisbursal,
       'NEFT',
-      `"SALARY SEP 2026 - SK ENTERPRISES"`,
+      `"SALARY ${currentMonthName.toUpperCase().slice(0, 3)} ${currentYear} - ${config?.companyName || 'SK ENTERPRISES'}"`,
       `"${e.id}"`,
       `"${e.bankName || 'HDFC Bank Ltd'}"`
     ]);
@@ -227,9 +237,9 @@ export default function ReportsView({
     const phone = (emp.phone || '').replace(/[^0-9]/g, '');
     const cleanPhone = phone.length === 10 ? `91${phone}` : phone;
     const siteAllow = emp.siteAllowance || 0;
-    const msg = `*SALARY SLIP - SEPTEMBER 2026*
-*SK ENTERPRISES*
-303, Panchsheel CHS Ltd, Plot No 07, Sec -02, Taloja Phase -01, Navi Mumbai - 410208
+    const msg = `*SALARY SLIP - ${currentMonthName.toUpperCase()} ${currentYear}*
+*${config?.companyName || 'SK ENTERPRISES'}*
+${config?.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
 
 Employee: *${emp.name}* (${emp.id})
 Designation: ${emp.role} | Dept: ${emp.department}
@@ -246,7 +256,7 @@ Designation: ${emp.role} | Dept: ${emp.department}
 - Overtime Pay: ₹${(emp.overallStats?.overtimePay || 0).toLocaleString('en-IN')}${siteAllow > 0 ? `\n- Site Allowance / Batta: ₹${siteAllow.toLocaleString('en-IN')}` : ''}
 ${emp.advanceAmount > 0 ? `- Advance Deducted: ₹${emp.advanceAmount.toLocaleString('en-IN')}\n` : ''}*Net Payable Salary: ₹${(emp.netDisbursal || 0).toLocaleString('en-IN')}*
 
-_This is a computer-generated salary slip from SK ENTERPRISES._`;
+_This is a computer-generated salary slip from ${config?.companyName || 'SK ENTERPRISES'}._`;
 
     const url = cleanPhone 
       ? `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(msg)}`

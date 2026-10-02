@@ -19,6 +19,7 @@ import {
   Printer
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
+import MonthlyRosterModal from './MonthlyRosterModal';
 
 export default function MonthlyAttendanceView({ 
   employees = [], 
@@ -35,6 +36,7 @@ export default function MonthlyAttendanceView({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [editingCell, setEditingCell] = useState(null); // { empId, empName, dateStr, currentStatus }
+  const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
 
   const departments = ['All', ...new Set([
     ...(config?.departments || []),
@@ -115,20 +117,24 @@ export default function MonthlyAttendanceView({
       const { [empId]: removed, ...rest } = dayRecords;
       updatedDayRecords = rest;
     } else {
-      const statusToSet = (newStatus && newStatus !== 'update_only') 
-        ? newStatus 
-        : (currentStatus !== 'none' && currentStatus !== 'weekend' ? currentStatus : 'present');
+      const isWODuty = newStatus === 'week_off_present' || newStatus === 'wo_present';
+      const statusToSet = isWODuty 
+        ? 'present' 
+        : ((newStatus && newStatus !== 'update_only') 
+          ? newStatus 
+          : (currentStatus !== 'none' && currentStatus !== 'weekend' ? currentStatus : 'present'));
 
       updatedDayRecords = {
         ...dayRecords,
         [empId]: {
           ...(dayRecords[empId] || {}),
           status: statusToSet,
-          clockIn: (statusToSet === 'present' || statusToSet === 'late') ? '09:30 AM' : statusToSet === 'wfh' ? '09:30 AM (WFH)' : '--',
-          clockOut: (statusToSet === 'present' || statusToSet === 'wfh' || statusToSet === 'late') ? '06:30 PM' : '--',
+          isWeekOffDuty: isWODuty,
+          clockIn: (statusToSet === 'present' || statusToSet === 'late') ? (dayRecords[empId]?.clockIn || '09:30 AM') : statusToSet === 'wfh' ? '09:30 AM (WFH)' : '--',
+          clockOut: (statusToSet === 'present' || statusToSet === 'wfh' || statusToSet === 'late') ? (dayRecords[empId]?.clockOut || '06:30 PM') : '--',
           workingHours: (statusToSet === 'present' || statusToSet === 'wfh' || statusToSet === 'late') ? '9h 00m' : statusToSet === 'holiday' ? '8h 00m' : statusToSet === 'half_day' ? '4h 30m' : (statusToSet === 'week_off' || statusToSet === 'leave' || statusToSet === 'absent') ? '0h 00m' : '--',
           overtimeHours: Math.max(0, resolvedOt),
-          note: statusToSet === 'week_off' ? 'Scheduled Week Off (WO)' : statusToSet === 'holiday' ? 'Public / Paid Festival Holiday (PH)' : (dayRecords[empId]?.note || `Marked via Monthly Matrix`)
+          note: isWODuty ? 'Week Off Duty (Present on Week Off)' : (statusToSet === 'week_off' ? 'Scheduled Week Off (WO)' : statusToSet === 'holiday' ? 'Public / Paid Festival Holiday (PH)' : (dayRecords[empId]?.note || `Marked via Monthly Matrix`))
         }
       };
     }
@@ -141,35 +147,43 @@ export default function MonthlyAttendanceView({
     setAttendance(updated);
     sounds.playSuccess();
     setEditingCell(null);
-    onSaveToast(`Updated ${editingCell.empName} on ${dateStr} (${newStatus === 'clear' ? 'Cleared' : newStatus === 'week_off' ? 'WEEK OFF' : newStatus === 'holiday' ? 'PAID HOLIDAY (PH)' : newStatus.toUpperCase()}${resolvedOt > 0 ? ` +${resolvedOt}h OT` : ''})`);
+    onSaveToast(`Updated ${editingCell.empName} on ${dateStr} (${newStatus === 'clear' ? 'Cleared' : newStatus === 'week_off_present' ? 'PRESENT ON WEEK OFF (WO DUTY)' : newStatus === 'week_off' ? 'WEEK OFF' : newStatus === 'holiday' ? 'PAID HOLIDAY (PH)' : newStatus.toUpperCase()}${resolvedOt > 0 ? ` +${resolvedOt}h OT` : ''})`);
   };
 
-  // 1-Click Auto-Mark all Sundays in this month as Week Off (WO)
+  // 1-Click Auto-Mark all Sundays in this month as Week Off (WO) - SAFE (Preserves existing punches)
   const handleAutoMarkSundaysWO = () => {
     sounds.playSuccess();
     const updated = { ...attendance };
     let sundaysCount = 0;
+    let preservedCount = 0;
 
     monthDays.forEach(({ dateStr, dayOfWeek }) => {
       if (dayOfWeek === 0) { // Sunday
         sundaysCount++;
         if (!updated[dateStr]) updated[dateStr] = {};
         employees.forEach(emp => {
+          const existing = updated[dateStr][emp.id];
+          // PRESERVE EXISTING ENTRIES: If employee has already punched in or was marked present/leave, DO NOT OVERWRITE!
+          if (existing && existing.status && existing.status !== 'none' && existing.status !== 'weekend' && existing.status !== 'week_off') {
+            preservedCount++;
+            return;
+          }
+
           updated[dateStr][emp.id] = {
-            ...(updated[dateStr][emp.id] || {}),
+            ...(existing || {}),
             status: 'week_off',
             clockIn: '--',
             clockOut: '--',
             workingHours: '0h 00m',
             overtimeHours: 0,
-            note: 'Auto Week Off (Sunday)'
+            note: 'Scheduled Week Off (Sunday)'
           };
         });
       }
     });
 
     setAttendance(updated);
-    onSaveToast(`1-Click Success: Marked all ${sundaysCount} Sundays as Week Off (WO) for all staff!`);
+    onSaveToast(`Marked ${sundaysCount} Sundays as Week Off! ${preservedCount > 0 ? `(Preserved ${preservedCount} existing punches/present records)` : ''}`);
   };
 
   // Helper to get status representation
@@ -197,7 +211,7 @@ export default function MonthlyAttendanceView({
     monthDays.forEach(({ dateStr, isWeekend }) => {
       const rec = attendance[dateStr]?.[empId];
       if (rec?.status) {
-        if (rec.status === 'present') office++;
+        if (rec.status === 'present' || rec.status === 'week_off_present' || rec.status === 'wo_present') office++;
         else if (rec.status === 'wfh') wfh++;
         else if (rec.status === 'late') { office++; late++; }
         else if (rec.status === 'half_day') halfDay++;
@@ -362,9 +376,18 @@ export default function MonthlyAttendanceView({
           )}
 
           <button
+            onClick={() => setIsRosterModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-500/20 transition-all active:scale-95"
+            title="Configure Monthly Shift Roster & Week-Off Presets without deleting existing attendance entries"
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            <span>Monthly Roster &amp; Presets</span>
+          </button>
+
+          <button
             onClick={handleAutoMarkSundaysWO}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/80 transition-colors shadow-xs"
-            title="Auto-mark all Sundays in this month as Week Off (WO) for all staff"
+            title="Auto-mark all Sundays in this month as Week Off (WO) for all staff (Preserves existing entries)"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Auto-Mark Sundays (WO)</span>
@@ -594,11 +617,15 @@ export default function MonthlyAttendanceView({
                             title={`${emp.name} on ${d.dateStr}: ${status.toUpperCase()}${ot > 0 ? ` (+${ot}h Overtime)` : ''} (Click to change)`}
                           >
                             <div className="flex flex-col items-center justify-center">
-                              {status === 'present' && (
+                              {(status === 'week_off_present' || status === 'wo_present' || (status === 'present' && rec?.isWeekOffDuty)) ? (
+                                <span className="inline-block px-1 h-6 rounded-lg bg-emerald-600 text-white font-black text-[8px] leading-6 shadow-2xs border border-amber-300 ring-1 ring-amber-400/50" title="Present on Week Off (WO Duty)">
+                                  WO-P
+                                </span>
+                              ) : status === 'present' ? (
                                 <span className="inline-block w-6 h-6 rounded-lg bg-emerald-500 text-white font-bold text-[10px] leading-6 shadow-2xs">
                                   P
                                 </span>
-                              )}
+                              ) : null}
                               {status === 'wfh' && (
                                 <span className="inline-block w-6 h-6 rounded-lg bg-indigo-500 text-white font-bold text-[10px] leading-6 shadow-2xs">
                                   W
@@ -830,6 +857,15 @@ export default function MonthlyAttendanceView({
               </button>
 
               <button
+                onClick={() => handleSetStatus('week_off_present')}
+                className="p-3 rounded-2xl bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-950/80 text-emerald-950 dark:text-emerald-100 border-2 border-emerald-500 flex items-center justify-center gap-2 col-span-2 shadow-xs font-black transition-all hover:scale-[1.01]"
+                title="Mark Present on Week Off (WO Duty - Extra day work / Double shift)"
+              >
+                <span className="w-4 h-4 rounded-full bg-emerald-600 flex items-center justify-center text-white text-[10px] font-black">★</span>
+                <span>Present on Week Off (WO Duty / Week-Off Present)</span>
+              </button>
+
+              <button
                 onClick={() => handleSetStatus('update_only')}
                 className="p-3 rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/50 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 flex items-center gap-2 transition-all col-span-2"
               >
@@ -854,6 +890,21 @@ export default function MonthlyAttendanceView({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Monthly Roster & Week-Off Presets Modal */}
+      {isRosterModalOpen && (
+        <MonthlyRosterModal
+          isOpen={isRosterModalOpen}
+          onClose={() => setIsRosterModalOpen(false)}
+          employees={employees}
+          attendance={attendance}
+          setAttendance={setAttendance}
+          config={config}
+          onSaveToast={onSaveToast}
+          initialYear={selectedYear}
+          initialMonth={selectedMonth}
+        />
       )}
 
     </div>
