@@ -201,7 +201,8 @@ export function calculateMonthlyPayrollStats({
   const tds = taxableSalary > 30000 ? Math.round(taxableSalary * 0.05) : 0;
   const advances = Number(advanceDeduction) || 0;
 
-  const totalDeductions = epf + esic + pt + tds + advances + lossOfPayDeduction;
+  // Total Applicable Deductions (strictly statutory & advances deducted from Gross Earnings)
+  const totalDeductions = epf + esic + pt + tds + advances;
   const netPayable = Math.max(0, grossEarnings - totalDeductions);
 
   return {

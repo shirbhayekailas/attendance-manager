@@ -97,21 +97,21 @@ export default function SalarySlipModal({
 Employee: *${employee.name}* (${employee.id})
 Designation: ${employee.role} | Dept: ${employee.department}
 
-*Attendance & Daily Rate Formula:*
+*Attendance & Working Days:*
 - Month Days: ${payroll.daysInMonth} Days
-- Daily Rate: ₹${payroll.perDaySalary}/day (₹${baseMonthly.toLocaleString('en-IN')} ÷ ${payroll.daysInMonth}d)
+- Daily Rate: ₹${payroll.perDaySalary}/day
 - Present / WFH: ${payroll.inOffice + payroll.wfh} Days
 - Paid Week Off (WO): ${payroll.weekOff} Days
 - Paid Leaves / Holidays: ${payroll.paidLeave + payroll.holidays} Days
 - Total Payable Days: ${payroll.payableDays} / ${payroll.daysInMonth}
-${payroll.lopDays > 0 ? `- Loss of Pay (LOP): ${payroll.lopDays} Days (-₹${payroll.lossOfPayDeduction.toLocaleString('en-IN')})\n` : ''}${payroll.totalOvertimeHours > 0 ? `- Overtime: ${payroll.totalOvertimeHours} hrs (+₹${payroll.overtimePay.toLocaleString('en-IN')})\n` : ''}${payroll.weekOffDuty > 0 ? `- Week Off Duty Extra Pay: ${payroll.weekOffDuty} days (+₹${payroll.weekOffDutyPay.toLocaleString('en-IN')})\n` : ''}
+${payroll.lopDays > 0 ? `- Unpaid / LOP: ${payroll.lopDays} Days\n` : ''}${payroll.totalOvertimeHours > 0 ? `- Overtime: ${payroll.totalOvertimeHours} hrs (+₹${payroll.overtimePay.toLocaleString('en-IN')})\n` : ''}${payroll.weekOffDuty > 0 ? `- Week Off Duty Extra Pay: ${payroll.weekOffDuty} days (+₹${payroll.weekOffDutyPay.toLocaleString('en-IN')})\n` : ''}
 *Earnings Breakdown:*
-- Basic CTC Salary: ₹${baseMonthly.toLocaleString('en-IN')}
+- Earned Basic Salary: ₹${payroll.earnedBasic.toLocaleString('en-IN')} (Base CTC: ₹${baseMonthly.toLocaleString('en-IN')})
 ${payroll.overtimePay > 0 ? `- Overtime Pay: ₹${payroll.overtimePay.toLocaleString('en-IN')}\n` : ''}${payroll.weekOffDutyPay > 0 ? `- Week Off Duty Pay: ₹${payroll.weekOffDutyPay.toLocaleString('en-IN')}\n` : ''}${siteAllowance > 0 ? `- Site Allowance / Batta: ₹${siteAllowance.toLocaleString('en-IN')}\n` : ''}*Gross Earnings: ₹${payroll.grossEarnings.toLocaleString('en-IN')}*
 
-*Deductions:*
+*Applicable Deductions:*
 ${isPfEsic ? `- EPF (12%): ₹${payroll.epf.toLocaleString('en-IN')}\n` : ''}${isPfEsic && payroll.esic > 0 ? `- ESIC (0.75%): ₹${payroll.esic.toLocaleString('en-IN')}\n` : ''}- Prof. Tax (PT): ₹${payroll.pt.toLocaleString('en-IN')}
-${payroll.lossOfPayDeduction > 0 ? `- Loss of Pay (LOP): ₹${payroll.lossOfPayDeduction.toLocaleString('en-IN')}\n` : ''}${payroll.advanceDeduction > 0 ? `- Advance Deducted: ₹${payroll.advanceDeduction.toLocaleString('en-IN')}\n` : ''}- Total Deductions: ₹${payroll.totalDeductions.toLocaleString('en-IN')}
+${payroll.advanceDeduction > 0 ? `- Advance Deducted: ₹${payroll.advanceDeduction.toLocaleString('en-IN')}\n` : ''}- Total Deductions: ₹${payroll.totalDeductions.toLocaleString('en-IN')}
 
 *Net Payable Salary: ₹${payroll.netPayable.toLocaleString('en-IN')}*
 In Words: ${netInWords}
@@ -133,7 +133,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
         @media print {
           @page {
             size: A4 portrait !important;
-            margin: 6mm 10mm !important;
+            margin: 6mm 8mm !important;
           }
           *,
           *::before,
@@ -161,20 +161,17 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-          #root {
-            display: none !important;
-          }
           .print-modal-overlay {
-            position: absolute !important;
-            inset: 0 !important;
+            position: static !important;
+            inset: auto !important;
             width: 100% !important;
             height: auto !important;
-            background: #ffffff !important;
+            background: transparent !important;
             padding: 0 !important;
             margin: 0 !important;
             overflow: visible !important;
             display: block !important;
-            z-index: 9999 !important;
+            z-index: auto !important;
           }
           .print-modal-body {
             max-width: 100% !important;
@@ -193,6 +190,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             box-shadow: none !important;
             border: none !important;
             width: 100% !important;
+            max-width: 100% !important;
             page-break-inside: avoid !important;
             page-break-after: avoid !important;
             break-after: avoid !important;
@@ -217,8 +215,8 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
               <h3 className="text-xs font-black text-slate-900 dark:text-white">
                 Official Salary Statement • {employee.name} ({employee.id})
               </h3>
-              <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold">
-                Per-Day Formula: ₹{baseMonthly.toLocaleString('en-IN')} ÷ {payroll.daysInMonth}d = ₹{payroll.perDaySalary}/day
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">
+                {payroll.monthYearStr} • {payroll.payableDays} Payable Days
               </p>
             </div>
           </div>
@@ -370,8 +368,8 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           <div className="border border-slate-300 rounded-lg overflow-hidden text-[10px] mb-2.5">
             <div className="bg-slate-100 font-black text-slate-800 px-3 py-0.5 border-b border-slate-300 uppercase tracking-wide text-[8.5px] flex items-center justify-between">
               <span>Attendance &amp; Shift Records for {payroll.monthYearStr}</span>
-              <span className="text-blue-700 font-bold">
-                Formula: ₹{baseMonthly.toLocaleString('en-IN')} ÷ {payroll.daysInMonth}d = ₹{payroll.perDaySalary.toLocaleString('en-IN')}/day
+              <span className="text-slate-600 font-semibold">
+                Calendar Days: {payroll.daysInMonth} Days
               </span>
             </div>
             <div className="grid grid-cols-8 divide-x divide-slate-300 text-center bg-white py-1">
@@ -426,9 +424,14 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                   <span>Amount (INR)</span>
                 </div>
                 <div className="divide-y divide-slate-100">
-                  <div className="px-3 py-1 flex justify-between">
-                    <span className="text-slate-600">Basic CTC Salary (Base)</span>
-                    <span className="font-mono font-bold text-slate-900">₹{baseMonthly.toLocaleString('en-IN')}</span>
+                  <div className="px-3 py-1 flex justify-between items-center">
+                    <div>
+                      <span className="text-slate-800 font-semibold block text-[10px]">Earned Basic Salary</span>
+                      <span className="text-[8px] text-slate-400 block">
+                        {payroll.payableDays} of {payroll.daysInMonth} Days Payable (Base CTC: ₹{baseMonthly.toLocaleString('en-IN')})
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-slate-900">₹{payroll.earnedBasic.toLocaleString('en-IN')}</span>
                   </div>
                   {payroll.overtimePay > 0 && (
                     <div className="px-3 py-1 flex justify-between bg-purple-50/40">
@@ -500,23 +503,15 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                     <span className="text-slate-600">Tax Deducted at Source (TDS)</span>
                     <span className="font-mono font-bold text-slate-900">₹{payroll.tds.toLocaleString('en-IN')}</span>
                   </div>
-                  {payroll.lopDays > 0 ? (
-                    <div className="px-3 py-1 flex justify-between bg-rose-50/50">
-                      <span className="text-rose-900 font-bold">
-                        Loss of Pay ({payroll.lopDays}d @ ₹{payroll.perDaySalary}/d)
-                      </span>
-                      <span className="font-mono font-bold text-rose-700">₹{payroll.lossOfPayDeduction.toLocaleString('en-IN')}</span>
-                    </div>
-                  ) : (
-                    <div className="px-3 py-1 flex justify-between">
-                      <span className="text-slate-500">Loss of Pay (0 LOP)</span>
-                      <span className="font-mono text-slate-400">₹0</span>
-                    </div>
-                  )}
-                  {payroll.advanceDeduction > 0 && (
+                  {payroll.advanceDeduction > 0 ? (
                     <div className="px-3 py-1 flex justify-between bg-amber-50/50">
                       <span className="text-amber-950 font-medium">Salary Advance Deduction</span>
                       <span className="font-mono font-bold text-amber-700">₹{payroll.advanceDeduction.toLocaleString('en-IN')}</span>
+                    </div>
+                  ) : (
+                    <div className="px-3 py-1 flex justify-between">
+                      <span className="text-slate-400">Salary Advance Deduction</span>
+                      <span className="font-mono text-slate-400">₹0</span>
                     </div>
                   )}
                 </div>
@@ -561,7 +556,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           <div className="p-2 px-3 rounded-lg bg-slate-50 border border-slate-200 text-[8.5px] text-slate-500 leading-snug mb-3">
             <p className="font-semibold text-slate-700 mb-0.5">Statutory &amp; Payroll Compliance Declaration:</p>
             <p>
-              1. This statement is an official computer-generated payslip issued under the Corporate HR &amp; Payroll regulations of {config.companyName || 'SK ENTERPRISES'}. Daily salary calculation: Base CTC divided by total calendar days ({payroll.daysInMonth} days).
+              1. This statement is an official computer-generated payslip issued under the Corporate HR &amp; Payroll regulations of {config.companyName || 'SK ENTERPRISES'}.
             </p>
             <p>
               {isPfEsic 
@@ -591,24 +586,24 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             <div className="flex flex-col items-center justify-center">
               <div className="w-12 h-12 rounded-full border-2 border-blue-900/60 flex flex-col items-center justify-center text-blue-950 p-1 rotate-[-6deg] bg-blue-50/50">
                 <ShieldCheck className="w-3.5 h-3.5 text-blue-900" />
-                <span className="text-[6px] font-black uppercase tracking-widest text-center mt-0.5 leading-none">
-                  AUDITED
+                <span className="text-[6.5px] font-black uppercase tracking-widest text-center mt-0.5 leading-none">
+                  {config.companyName ? config.companyName.split(' ')[0] : 'SK'}
                 </span>
-                <span className="text-[5px] font-mono text-slate-600 leading-none">PAYROLL</span>
+                <span className="text-[5px] font-mono text-slate-600 leading-none">COMPANY SEAL</span>
               </div>
-              <span className="text-[8px] text-slate-400 mt-0.5 uppercase font-semibold">Corporate Stamp</span>
+              <span className="text-[8px] text-slate-400 mt-0.5 uppercase font-semibold">Company Seal</span>
             </div>
 
             {/* HR / Finance Authorized Signatory */}
             <div className="space-y-1">
               <div className="h-6 flex items-center justify-center">
-                <span className="font-serif italic font-black text-sm text-blue-950 transform rotate-[-4deg] tracking-wide">
-                  S. K. Singhania
+                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">
+                  For {config.companyName || 'SK ENTERPRISES'}
                 </span>
               </div>
               <div className="border-t border-slate-400 pt-0.5 mx-4">
                 <p className="text-[10px] font-bold text-slate-900 leading-tight">Authorized Signatory</p>
-                <p className="text-[8px] text-slate-400 uppercase font-semibold">VP - Human Resources &amp; Finance</p>
+                <p className="text-[8px] text-slate-400 uppercase font-semibold">HR &amp; Finance Department</p>
               </div>
             </div>
 

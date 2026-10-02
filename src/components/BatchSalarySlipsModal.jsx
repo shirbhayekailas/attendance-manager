@@ -237,9 +237,14 @@ export default function BatchSalarySlipsModal({
                       <span>Amount (INR)</span>
                     </div>
                     <div className="p-3 space-y-1.5">
-                      <div className="flex justify-between">
-                        <span className="text-slate-600">Basic CTC Salary</span>
-                        <span className="font-mono font-bold">₹{baseMonthly.toLocaleString('en-IN')}</span>
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <span className="text-slate-800 font-semibold block">Earned Basic Salary</span>
+                          <span className="text-[9px] text-slate-400">
+                            {payroll.payableDays} / {payroll.daysInMonth} Days (Base: ₹{baseMonthly.toLocaleString('en-IN')})
+                          </span>
+                        </div>
+                        <span className="font-mono font-bold">₹{payroll.earnedBasic.toLocaleString('en-IN')}</span>
                       </div>
                       {payroll.overtimePay > 0 && (
                         <div className="flex justify-between text-amber-700 font-bold">
@@ -285,16 +290,15 @@ export default function BatchSalarySlipsModal({
                         <span className="text-slate-600">Professional Tax (PT)</span>
                         <span className="font-mono font-bold">₹{payroll.pt}</span>
                       </div>
-                      {payroll.lopDays > 0 && (
-                        <div className="flex justify-between text-rose-700 font-bold">
-                          <span>Loss of Pay ({payroll.lopDays}d @ ₹{payroll.perDaySalary}/d)</span>
-                          <span className="font-mono">-₹{payroll.lossOfPayDeduction.toLocaleString('en-IN')}</span>
-                        </div>
-                      )}
-                      {payroll.advanceDeduction > 0 && (
+                      {payroll.advanceDeduction > 0 ? (
                         <div className="flex justify-between text-amber-700 font-bold">
                           <span>Salary Advance Recovered</span>
                           <span className="font-mono">-₹{payroll.advanceDeduction.toLocaleString('en-IN')}</span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between text-slate-400">
+                          <span>Salary Advance Recovered</span>
+                          <span className="font-mono">₹0</span>
                         </div>
                       )}
                     </div>
