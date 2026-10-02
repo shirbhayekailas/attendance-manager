@@ -101,7 +101,8 @@ export default function SalarySlipModal({
         filename: `Salary_Slip_${employee.name.replace(/\s+/g, '_')}_${payroll.monthName}_${selectedYear}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
       await html2pdf().set(opt).from(element).save();
@@ -160,22 +161,17 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
         @media print {
           @page {
             size: A4 portrait !important;
-            margin: 6mm 8mm !important;
+            margin: 4mm 6mm !important;
           }
-          *,
-          *::before,
-          *::after {
+          *, *::before, *::after {
+            box-sizing: border-box !important;
             scrollbar-width: none !important;
             -ms-overflow-style: none !important;
-            box-sizing: border-box !important;
           }
-          *::-webkit-scrollbar,
-          ::-webkit-scrollbar {
+          *::-webkit-scrollbar, ::-webkit-scrollbar {
             display: none !important;
             width: 0 !important;
             height: 0 !important;
-            opacity: 0 !important;
-            background: transparent !important;
           }
           html, body {
             background: #ffffff !important;
@@ -183,22 +179,22 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             height: auto !important;
             margin: 0 !important;
             padding: 0 !important;
-            overflow: visible !important;
-            overflow-x: visible !important;
+            overflow: hidden !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
           .print-modal-overlay {
-            position: static !important;
-            inset: auto !important;
+            position: absolute !important;
+            inset: 0 !important;
+            top: 0 !important;
+            left: 0 !important;
             width: 100% !important;
             height: auto !important;
-            background: transparent !important;
+            background: #ffffff !important;
             padding: 0 !important;
             margin: 0 !important;
-            overflow: visible !important;
             display: block !important;
-            z-index: auto !important;
+            z-index: 9999 !important;
           }
           .print-modal-body {
             max-width: 100% !important;
@@ -207,7 +203,6 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             box-shadow: none !important;
             padding: 0 !important;
             margin: 0 !important;
-            overflow: visible !important;
             background: #ffffff !important;
           }
           .no-print {
@@ -219,13 +214,13 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             width: 100% !important;
             max-width: 100% !important;
             page-break-inside: avoid !important;
+            page-break-before: avoid !important;
             page-break-after: avoid !important;
+            break-inside: avoid !important;
             break-after: avoid !important;
-            max-height: 100% !important;
-            overflow: visible !important;
+            overflow: hidden !important;
             padding: 0 !important;
             margin: 0 !important;
-            scrollbar-width: none !important;
           }
         }
       `}</style>
@@ -308,39 +303,43 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
         </div>
 
         {/* Printable Document Sheet (Strictly fitted for single A4 page) */}
-        <div id="printable-salary-slip" className="salary-slip-page p-5 sm:p-7 md:p-8 bg-white text-slate-900 printable-document">
+        <div 
+          id="printable-salary-slip" 
+          className="salary-slip-page p-4 sm:p-5 bg-white text-slate-900 printable-document max-w-[760px] mx-auto text-[10px]"
+          style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
+        >
           
           {/* Header with Company Logo & Document Identity */}
-          <div className="border-b-2 border-slate-900 pb-2.5 mb-2.5">
+          <div className="border-b-2 border-slate-900 pb-2 mb-2">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
+                  <div className="w-7 h-7 rounded-md bg-blue-700 text-white flex items-center justify-center font-black text-xs shrink-0 shadow-xs">
                     SK
                   </div>
-                  <h1 className="text-xl font-black tracking-tight text-slate-950 uppercase leading-tight">
+                  <h1 className="text-lg font-black tracking-tight text-slate-950 uppercase leading-tight">
                     {config.companyName || 'SK ENTERPRISES'}
                   </h1>
                 </div>
-                <p className="text-[10px] text-slate-700 font-medium max-w-xl">
+                <p className="text-[9.5px] text-slate-700 font-medium max-w-xl">
                   {config.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
                 </p>
-                <p className="text-[9px] text-slate-500 font-medium">
+                <p className="text-[8.5px] text-slate-500 font-medium">
                   CIN: U72200MH2021PTC368412 • GSTIN: 27AABCT3920K1ZM • PF Reg: MH/BAN/0048291
                 </p>
               </div>
 
               <div className="text-right space-y-0.5 shrink-0">
-                <div className="inline-block px-2.5 py-0.5 rounded bg-slate-950 text-white text-[9.5px] font-black tracking-wider uppercase">
+                <div className="inline-block px-2 py-0.5 rounded bg-slate-950 text-white text-[9px] font-black tracking-wider uppercase">
                   SALARY PAYSLIP
                 </div>
-                <div className="text-[11px] font-bold text-slate-900">
+                <div className="text-[10px] font-bold text-slate-900">
                   Pay Period: <span className="font-black text-blue-700 uppercase">{payroll.monthYearStr}</span>
                 </div>
-                <div className="text-[9.5px] text-slate-500 font-mono">
+                <div className="text-[9px] text-slate-500 font-mono">
                   Ref No: <span className="font-bold text-slate-800">{payslipRef}</span>
                 </div>
-                <div className="text-[9.5px] text-slate-500">
+                <div className="text-[9px] text-slate-500">
                   Payment Date: <span className="font-semibold text-slate-700">{paymentDate}</span>
                 </div>
               </div>
@@ -348,46 +347,46 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           </div>
 
           {/* Employee Metadata 4-Column Table */}
-          <div className="border border-slate-300 rounded-lg overflow-hidden text-[10px] mb-2.5">
-            <div className="bg-slate-100 font-black text-slate-800 px-3 py-1 border-b border-slate-300 uppercase tracking-wide text-[9px]">
+          <div className="border border-slate-300 rounded-md overflow-hidden text-[9.5px] mb-2">
+            <div className="bg-slate-100 font-black text-slate-800 px-2.5 py-0.5 border-b border-slate-300 uppercase tracking-wide text-[8.5px]">
               Employee Identification &amp; Bank Credentials
             </div>
             <div className="grid grid-cols-4 divide-x divide-slate-300 bg-white">
-              <div className="p-1.5 px-2.5">
-                <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Employee Name</span>
-                <span className="font-black text-slate-900 text-xs truncate block">{employee.name}</span>
+              <div className="p-1 px-2">
+                <span className="text-[8px] text-slate-400 font-semibold block uppercase">Employee Name</span>
+                <span className="font-black text-slate-900 text-[11px] truncate block">{employee.name}</span>
               </div>
-              <div className="p-1.5 px-2.5">
-                <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Employee Code</span>
+              <div className="p-1 px-2">
+                <span className="text-[8px] text-slate-400 font-semibold block uppercase">Employee Code</span>
                 <span className="font-mono font-bold text-slate-900 block">{employee.id}</span>
               </div>
-              <div className="p-1.5 px-2.5">
-                <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Designation</span>
+              <div className="p-1 px-2">
+                <span className="text-[8px] text-slate-400 font-semibold block uppercase">Designation</span>
                 <span className="font-bold text-slate-900 truncate block">{employee.role}</span>
               </div>
-              <div className="p-1.5 px-2.5">
-                <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Department</span>
+              <div className="p-1 px-2">
+                <span className="text-[8px] text-slate-400 font-semibold block uppercase">Department</span>
                 <span className="font-bold text-slate-900 truncate block">{employee.department}</span>
               </div>
             </div>
 
             <div className="grid grid-cols-4 divide-x divide-slate-300 border-t border-slate-300 bg-slate-50/60">
-              <div className="p-1.5 px-2.5">
-                <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Bank Name</span>
+              <div className="p-1 px-2">
+                <span className="text-[8px] text-slate-400 font-semibold block uppercase">Bank Name</span>
                 <span className="font-bold text-slate-800 block truncate">{employee.bankName || 'HDFC Bank Ltd'}</span>
               </div>
-              <div className="p-1.5 px-2.5">
-                <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Bank Account No</span>
+              <div className="p-1 px-2">
+                <span className="text-[8px] text-slate-400 font-semibold block uppercase">Bank Account No</span>
                 <span className="font-mono font-bold text-slate-800 block truncate">
                   {employee.bankAccountNo ? employee.bankAccountNo : '•••• •••• •••• 4892'}
                 </span>
               </div>
-              <div className="p-1.5 px-2.5">
-                <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">Income Tax PAN</span>
+              <div className="p-1 px-2">
+                <span className="text-[8px] text-slate-400 font-semibold block uppercase">Income Tax PAN</span>
                 <span className="font-mono font-bold text-slate-800 block">AAACS{employee.id.replace(/\D/g, '') || '1029'}F</span>
               </div>
-              <div className="p-1.5 px-2.5">
-                <span className="text-[8.5px] text-slate-400 font-semibold block uppercase">
+              <div className="p-1 px-2">
+                <span className="text-[8px] text-slate-400 font-semibold block uppercase">
                   {isPfEsic ? 'PF / UAN & ESIC No' : 'Statutory Status'}
                 </span>
                 <span className="font-mono font-bold text-slate-800 block truncate">
@@ -401,129 +400,117 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           </div>
 
           {/* Monthly Attendance Summary Metrics Bar (Dynamic Days in Month formula) */}
-          <div className="border border-slate-300 rounded-lg overflow-hidden text-[10px] mb-2.5">
-            <div className="bg-slate-100 font-black text-slate-800 px-3 py-0.5 border-b border-slate-300 uppercase tracking-wide text-[8.5px] flex items-center justify-between">
+          <div className="border border-slate-300 rounded-md overflow-hidden text-[9.5px] mb-2">
+            <div className="bg-slate-100 font-black text-slate-800 px-2.5 py-0.5 border-b border-slate-300 uppercase tracking-wide text-[8px] flex items-center justify-between">
               <span>Attendance &amp; Shift Records for {payroll.monthYearStr}</span>
               <span className="text-slate-600 font-semibold">
                 Calendar Days: {payroll.daysInMonth} Days
               </span>
             </div>
-            <div className="grid grid-cols-8 divide-x divide-slate-300 text-center bg-white py-1">
+            <div className="grid grid-cols-8 divide-x divide-slate-300 text-center bg-white py-0.5">
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Calendar Days</div>
-                <div className="text-xs font-black text-slate-900">{payroll.daysInMonth}</div>
+                <div className="text-[7.5px] text-slate-500 font-medium">Calendar Days</div>
+                <div className="text-[11px] font-black text-slate-900">{payroll.daysInMonth}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Present / WFH</div>
-                <div className="text-xs font-black text-emerald-600">{payroll.inOffice + payroll.wfh}</div>
+                <div className="text-[7.5px] text-slate-500 font-medium">Present / WFH</div>
+                <div className="text-[11px] font-black text-emerald-600">{payroll.inOffice + payroll.wfh}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Paid Week Off</div>
-                <div className="text-xs font-black text-sky-600">{payroll.weekOff}</div>
+                <div className="text-[7.5px] text-slate-500 font-medium">Paid Week Off</div>
+                <div className="text-[11px] font-black text-sky-600">{payroll.weekOff}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">★ WO Duty</div>
-                <div className="text-xs font-black text-amber-600">{payroll.weekOffDuty}d</div>
+                <div className="text-[7.5px] text-slate-500 font-medium">★ WO Duty</div>
+                <div className="text-[11px] font-black text-amber-600">{payroll.weekOffDuty}d</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Paid Leaves / PH</div>
-                <div className="text-xs font-black text-blue-600">{payroll.paidLeave + payroll.holidays}</div>
+                <div className="text-[7.5px] text-slate-500 font-medium">Paid Leaves / PH</div>
+                <div className="text-[11px] font-black text-blue-600">{payroll.paidLeave + payroll.holidays}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Payable Days</div>
-                <div className="text-xs font-black text-emerald-700 bg-emerald-50 rounded">
+                <div className="text-[7.5px] text-slate-500 font-medium">Payable Days</div>
+                <div className="text-[11px] font-black text-emerald-700 bg-emerald-50 rounded">
                   {payroll.payableDays}
                   {payroll.weekOffDuty > 0 && (
-                    <span className="text-[8px] text-amber-600 font-bold ml-0.5">(+{payroll.weekOffDuty})</span>
+                    <span className="text-[7.5px] text-amber-600 font-bold ml-0.5">(+{payroll.weekOffDuty})</span>
                   )}
                 </div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Loss of Pay (LOP)</div>
-                <div className="text-xs font-black text-rose-600">{payroll.lopDays}</div>
+                <div className="text-[7.5px] text-slate-500 font-medium">Loss of Pay (LOP)</div>
+                <div className="text-[11px] font-black text-rose-600">{payroll.lopDays}</div>
               </div>
               <div className="px-1">
-                <div className="text-[8px] text-slate-500 font-medium">Overtime</div>
-                <div className="text-xs font-black text-purple-600">{payroll.totalOvertimeHours} hrs</div>
+                <div className="text-[7.5px] text-slate-500 font-medium">Overtime</div>
+                <div className="text-[11px] font-black text-purple-600">{payroll.totalOvertimeHours}h</div>
               </div>
             </div>
           </div>
 
           {/* Dual Column: Earnings vs Deductions Table */}
-          <div className="border border-slate-300 rounded-lg overflow-hidden text-[10px] mb-2.5">
+          <div className="border border-slate-300 rounded-md overflow-hidden text-[9.5px] mb-2">
             <div className="grid grid-cols-2 divide-x divide-slate-300">
               
               {/* Left Column: Earnings */}
               <div>
-                <div className="bg-emerald-50 text-emerald-950 font-black px-3 py-1 border-b border-slate-300 flex justify-between uppercase text-[8.5px] tracking-wide">
+                <div className="bg-emerald-50 text-emerald-950 font-black px-2.5 py-0.5 border-b border-slate-300 flex justify-between uppercase text-[8px] tracking-wide">
                   <span>Earnings Component</span>
                   <span>Amount (INR)</span>
                 </div>
-                <div className="divide-y divide-slate-100">
-                  <div className="px-3 py-1 flex justify-between items-center">
+                <div className="divide-y divide-slate-100 text-[9px]">
+                  <div className="px-2.5 py-1 flex justify-between items-center">
                     <div>
-                      <span className="text-slate-800 font-semibold block text-[10px]">Earned Basic Salary</span>
-                      <span className="text-[8px] text-slate-400 block">
-                        {payroll.payableDays} of {payroll.daysInMonth} Days Payable (Base CTC: ₹{baseMonthly.toLocaleString('en-IN')})
+                      <span className="text-slate-800 font-semibold block text-[9.5px]">Earned Basic Salary</span>
+                      <span className="text-[7.5px] text-slate-400 block">
+                        {payroll.payableDays} of {payroll.daysInMonth} Days Payable (Base: ₹{baseMonthly.toLocaleString('en-IN')})
                       </span>
                     </div>
                     <span className="font-mono font-bold text-slate-900">₹{payroll.earnedBasic.toLocaleString('en-IN')}</span>
                   </div>
                   {payroll.overtimePay > 0 && (
-                    <div className="px-3 py-1 flex justify-between bg-purple-50/40">
+                    <div className="px-2.5 py-1 flex justify-between bg-purple-50/40">
                       <span className="text-purple-900 font-medium">Overtime Pay ({payroll.totalOvertimeHours}h @ 1.5x)</span>
                       <span className="font-mono font-bold text-purple-700">₹{payroll.overtimePay.toLocaleString('en-IN')}</span>
                     </div>
                   )}
                   {payroll.weekOffDutyPay > 0 && (
-                    <div className="px-3 py-1 flex justify-between bg-sky-50/60">
+                    <div className="px-2.5 py-1 flex justify-between bg-sky-50/60">
                       <span className="text-sky-950 font-medium">Week Off Duty Extra Pay ({payroll.weekOffDuty}d @ ₹{payroll.perDaySalary}/d)</span>
                       <span className="font-mono font-bold text-sky-700">₹{payroll.weekOffDutyPay.toLocaleString('en-IN')}</span>
                     </div>
                   )}
                   {siteAllowance > 0 && (
-                    <div className="px-3 py-1 flex justify-between bg-amber-50/50">
+                    <div className="px-2.5 py-1 flex justify-between bg-amber-50/50">
                       <span className="text-amber-900 font-medium">Site Allowance / Batta</span>
                       <span className="font-mono font-bold text-amber-700">₹{siteAllowance.toLocaleString('en-IN')}</span>
                     </div>
                   )}
-                  <div className="px-3 py-1 flex justify-between">
-                    <span className="text-slate-600">Performance Incentive / Bonus</span>
+                  <div className="px-2.5 py-1 flex justify-between">
+                    <span className="text-slate-600">Other Allowances &amp; Incentives</span>
                     <span className="font-mono font-bold text-slate-900">₹0</span>
-                  </div>
-                  <div className="px-3 py-1 flex justify-between">
-                    <span className="text-slate-600">Dearness Allowance (DA)</span>
-                    <span className="font-mono font-bold text-slate-900">₹0</span>
-                  </div>
-                  <div className="px-3 py-1 flex justify-between">
-                    <span className="text-slate-600">Special Allowances</span>
-                    <span className="font-mono font-bold text-slate-900">₹0</span>
-                  </div>
-                  <div className="px-3 py-1 flex justify-between">
-                    <span className="text-slate-400 italic">Other Allowances</span>
-                    <span className="font-mono font-bold text-slate-400">₹0</span>
                   </div>
                 </div>
-                <div className="bg-slate-100 border-t border-slate-300 px-3 py-1.5 flex justify-between font-black text-slate-900">
+                <div className="bg-slate-100 border-t border-slate-300 px-2.5 py-1 flex justify-between font-black text-slate-900 text-[9.5px]">
                   <span>GROSS EARNINGS (A)</span>
-                  <span className="font-mono text-xs text-emerald-700">₹{payroll.grossEarnings.toLocaleString('en-IN')}</span>
+                  <span className="font-mono text-[11px] text-emerald-700">₹{payroll.grossEarnings.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
               {/* Right Column: Deductions */}
               <div>
-                <div className="bg-rose-50 text-rose-950 font-black px-3 py-1 border-b border-slate-300 flex justify-between uppercase text-[8.5px] tracking-wide">
+                <div className="bg-rose-50 text-rose-950 font-black px-2.5 py-0.5 border-b border-slate-300 flex justify-between uppercase text-[8px] tracking-wide">
                   <span>Deductions Component</span>
                   <span>Amount (INR)</span>
                 </div>
-                <div className="divide-y divide-slate-100">
-                  <div className="px-3 py-1 flex justify-between">
+                <div className="divide-y divide-slate-100 text-[9px]">
+                  <div className="px-2.5 py-1 flex justify-between">
                     <span className="text-slate-600">Employee Provident Fund (EPF {payroll.isPfEsic ? '12%' : 'Exempt'})</span>
                     <span className="font-mono font-bold text-slate-900">
                       {payroll.isPfEsic ? `₹${payroll.epf.toLocaleString('en-IN')}` : '₹0 (Exempt)'}
                     </span>
                   </div>
-                  <div className="px-3 py-1 flex justify-between">
+                  <div className="px-2.5 py-1 flex justify-between">
                     <span className="text-slate-600">Employee State Insurance (ESIC {payroll.isPfEsic ? '0.75%' : 'Exempt'})</span>
                     <span className="font-mono font-bold text-slate-900">
                       {payroll.isPfEsic 
@@ -531,29 +518,24 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                         : '₹0 (Exempt)'}
                     </span>
                   </div>
-                  <div className="px-3 py-1 flex justify-between">
+                  <div className="px-2.5 py-1 flex justify-between">
                     <span className="text-slate-600">Professional Tax (PT)</span>
                     <span className="font-mono font-bold text-slate-900">₹{payroll.pt.toLocaleString('en-IN')}</span>
                   </div>
-                  <div className="px-3 py-1 flex justify-between">
+                  <div className="px-2.5 py-1 flex justify-between">
                     <span className="text-slate-600">Tax Deducted at Source (TDS)</span>
                     <span className="font-mono font-bold text-slate-900">₹{payroll.tds.toLocaleString('en-IN')}</span>
                   </div>
-                  {payroll.advanceDeduction > 0 ? (
-                    <div className="px-3 py-1 flex justify-between bg-amber-50/50">
+                  {payroll.advanceDeduction > 0 && (
+                    <div className="px-2.5 py-1 flex justify-between bg-amber-50/50">
                       <span className="text-amber-950 font-medium">Salary Advance Deduction</span>
                       <span className="font-mono font-bold text-amber-700">₹{payroll.advanceDeduction.toLocaleString('en-IN')}</span>
                     </div>
-                  ) : (
-                    <div className="px-3 py-1 flex justify-between">
-                      <span className="text-slate-400">Salary Advance Deduction</span>
-                      <span className="font-mono text-slate-400">₹0</span>
-                    </div>
                   )}
                 </div>
-                <div className="bg-slate-100 border-t border-slate-300 px-3 py-1.5 flex justify-between font-black text-slate-900">
+                <div className="bg-slate-100 border-t border-slate-300 px-2.5 py-1 flex justify-between font-black text-slate-900 text-[9.5px]">
                   <span>TOTAL DEDUCTIONS (B)</span>
-                  <span className="font-mono text-xs text-rose-700">₹{payroll.totalDeductions.toLocaleString('en-IN')}</span>
+                  <span className="font-mono text-[11px] text-rose-700">₹{payroll.totalDeductions.toLocaleString('en-IN')}</span>
                 </div>
               </div>
 
@@ -561,22 +543,22 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           </div>
 
           {/* Net Salary Payable Grand Callout Box */}
-          <div className="p-2.5 px-4 rounded-xl border-2 border-slate-900 bg-slate-950 text-white flex items-center justify-between gap-4 mb-2.5">
+          <div className="p-2 px-3 rounded-lg border-2 border-slate-900 bg-slate-950 text-white flex items-center justify-between gap-4 mb-2">
             <div className="space-y-0.5">
-              <span className="text-[9px] uppercase font-black text-blue-400 tracking-wider">
+              <span className="text-[8.5px] uppercase font-black text-blue-400 tracking-wider">
                 NET SALARY PAYABLE (Gross A - Deductions B)
               </span>
-              <div className="text-2xl font-black font-mono tracking-tight text-white leading-tight">
+              <div className="text-xl font-black font-mono tracking-tight text-white leading-tight">
                 ₹{payroll.netPayable.toLocaleString('en-IN')}
               </div>
-              <div className="text-[10px] font-semibold text-slate-300 italic">
+              <div className="text-[9.5px] font-semibold text-slate-300 italic">
                 In Words: <span className="font-bold text-white not-italic">{netInWords}</span>
               </div>
             </div>
 
-            <div className="border-l border-slate-800 pl-4 space-y-0.5 text-right text-[9.5px] shrink-0">
+            <div className="border-l border-slate-800 pl-3 space-y-0.5 text-right text-[8.5px] shrink-0">
               <div className="flex items-center justify-end gap-1.5 text-emerald-400 font-bold">
-                <CheckCircle2 className="w-3.5 h-3.5" />
+                <CheckCircle2 className="w-3 h-3" />
                 <span>Credited to Bank Account</span>
               </div>
               <div className="text-slate-400">
@@ -589,7 +571,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           </div>
 
           {/* Legal Compliance and Certification Note */}
-          <div className="p-2 px-3 rounded-lg bg-slate-50 border border-slate-200 text-[8.5px] text-slate-500 leading-snug mb-3">
+          <div className="p-1.5 px-2.5 rounded-md bg-slate-50 border border-slate-200 text-[8px] text-slate-500 leading-tight mb-2">
             <p className="font-semibold text-slate-700 mb-0.5">Statutory &amp; Payroll Compliance Declaration:</p>
             <p>
               1. This statement is an official computer-generated payslip issued under the Corporate HR &amp; Payroll regulations of {config.companyName || 'SK ENTERPRISES'}.
@@ -607,25 +589,25 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           </div>
 
           {/* Signatures & Physical Stamp Area */}
-          <div className="pt-3 border-t border-slate-300 grid grid-cols-2 gap-12 items-end">
+          <div className="pt-1.5 border-t border-slate-300 grid grid-cols-2 gap-8 items-end">
             
             {/* Employee Signature */}
-            <div className="space-y-2 text-center">
-              <div className="h-14 flex items-end justify-center">
-                <div className="w-48 border-b border-dashed border-slate-400"></div>
+            <div className="space-y-1 text-center">
+              <div className="h-8 flex items-end justify-center">
+                <div className="w-40 border-b border-dashed border-slate-400"></div>
               </div>
               <div>
-                <p className="text-[10px] font-bold text-slate-900 leading-tight">{employee.name}</p>
-                <p className="text-[8px] text-slate-400 uppercase font-semibold">Employee Signature</p>
+                <p className="text-[9.5px] font-bold text-slate-900 leading-tight">{employee.name}</p>
+                <p className="text-[7.5px] text-slate-400 uppercase font-semibold">Employee Signature</p>
               </div>
             </div>
 
             {/* HR / Finance Authorized Signatory (Clean space for Physical Rubber Stamp & Ink Signature) */}
-            <div className="space-y-2 text-center">
-              <div className="h-14"></div>
-              <div className="w-56 mx-auto border-t border-slate-700 pt-1">
-                <p className="text-[10px] font-bold text-slate-900 leading-tight">Authorized Signatory</p>
-                <p className="text-[8px] text-slate-400 uppercase font-semibold">HR &amp; Finance Department</p>
+            <div className="space-y-1 text-center">
+              <div className="h-8"></div>
+              <div className="w-48 mx-auto border-t border-slate-700 pt-0.5">
+                <p className="text-[9.5px] font-bold text-slate-900 leading-tight">Authorized Signatory</p>
+                <p className="text-[7.5px] text-slate-400 uppercase font-semibold">HR &amp; Finance Department</p>
               </div>
             </div>
 
