@@ -16,7 +16,8 @@ import {
   KeyRound,
   Smartphone,
   Download,
-  X
+  X,
+  Contact
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
 
@@ -32,6 +33,7 @@ export default function Navbar({
   currentUser,
   onLogout,
   onOpenUserAccess,
+  onNavigate,
   syncStatus = 'synced'
 }) {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -279,6 +281,21 @@ export default function Navbar({
               >
                 <Smartphone className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Install App</span>
+              </button>
+            )}
+
+            {/* ID Cards Studio Quick Access Button */}
+            {onNavigate && (isAdmin || isManager) && (
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  onNavigate('idcards');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 text-xs font-bold transition active:scale-95 shadow-xs cursor-pointer"
+                title="Open Employee ID Card Studio & A4 Bulk Printing"
+              >
+                <Contact className="w-3.5 h-3.5" />
+                <span>🪪 ID Cards</span>
               </button>
             )}
 

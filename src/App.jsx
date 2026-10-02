@@ -612,6 +612,7 @@ export default function App() {
         syncStatus={syncStatus}
         onLogout={() => handleLogout('manual')}
         onOpenUserAccess={() => setIsUserAccessOpen(true)}
+        onNavigate={setCurrentTab}
         notifications={INITIAL_NOTIFICATIONS}
         onOpenSearch={() => setIsSearchOpen(true)}
       />
@@ -848,6 +849,7 @@ export default function App() {
             expenses={expenses}
             config={config}
             onClose={() => setSelectedEmployee(null)}
+            onNavigate={setCurrentTab}
           />
         </ErrorBoundary>
       )}

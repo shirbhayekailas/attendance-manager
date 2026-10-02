@@ -16,7 +16,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Printer,
-  IndianRupee
+  IndianRupee,
+  Contact
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
 import { getEmployeeTotalAdvance } from '../utils/storage';
@@ -29,7 +30,8 @@ export default function MemberProfileModal({
   advances = [],
   setAdvances,
   config, 
-  onClose 
+  onClose,
+  onNavigate
 }) {
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [activeProfileTab, setActiveProfileTab] = useState('monthly'); // 'monthly' | 'heatmap' | 'history'
@@ -178,19 +180,33 @@ export default function MemberProfileModal({
         {/* Header */}
         <div className="p-6 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white relative border-b border-blue-900/50">
           <div className="absolute top-5 right-5 flex items-center gap-2 no-print">
+            {onNavigate && (
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  onClose();
+                  onNavigate('idcards');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                title="Generate & Print ID Card for this employee"
+              >
+                <Contact className="w-4 h-4" />
+                <span>🪪 ID Card</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 sounds.playSuccess();
                 window.print();
               }}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
               title="Print Employee Dossier"
             >
               <Printer className="w-5 h-5" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
+              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

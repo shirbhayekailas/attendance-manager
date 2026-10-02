@@ -16,7 +16,8 @@ import {
   Sparkles,
   Layers,
   UserPlus,
-  Download
+  Download,
+  Contact
 } from 'lucide-react';
 import { 
   calculateEmployeeStats, 
@@ -121,6 +122,18 @@ export default function DashboardView({
           >
             <UserPlus className="w-4 h-4" />
             <span>+ Add Employee</span>
+          </button>
+
+          <button
+            onClick={() => {
+              sounds.playSuccess();
+              onNavigate('idcards');
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold rounded-2xl text-xs sm:text-sm transition-all shadow-lg shadow-purple-600/30 active:scale-95 cursor-pointer"
+            title="Generate & Print Official Employee ID Cards with Smart QR Code"
+          >
+            <Contact className="w-4 h-4 text-purple-200" />
+            <span>🪪 Employee ID Cards</span>
           </button>
 
           <button

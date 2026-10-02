@@ -77,6 +77,13 @@ export default function Sidebar({
           badge: null,
         },
         {
+          id: 'idcards',
+          label: 'Employee ID Cards & QR',
+          icon: Contact,
+          badge: 'NEW 🪪',
+          badgeColor: 'bg-purple-500/20 text-purple-600 dark:text-purple-300 border border-purple-500/40 font-black',
+        },
+        {
           id: 'leaves',
           label: 'Leaves & Regularization',
           icon: CalendarDays,
@@ -107,13 +114,6 @@ export default function Sidebar({
           icon: FileCheck2,
           badge: '1-Click',
           badgeColor: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20',
-        },
-        {
-          id: 'idcards',
-          label: 'Employee ID Cards & QR',
-          icon: Contact,
-          badge: 'Print/A4',
-          badgeColor: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20',
         },
         {
           id: 'assets',
