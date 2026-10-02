@@ -374,7 +374,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                 Formula: ₹{baseMonthly.toLocaleString('en-IN')} ÷ {payroll.daysInMonth}d = ₹{payroll.perDaySalary.toLocaleString('en-IN')}/day
               </span>
             </div>
-            <div className="grid grid-cols-7 divide-x divide-slate-300 text-center bg-white py-1">
+            <div className="grid grid-cols-8 divide-x divide-slate-300 text-center bg-white py-1">
               <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Calendar Days</div>
                 <div className="text-xs font-black text-slate-900">{payroll.daysInMonth}</div>
@@ -388,12 +388,21 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
                 <div className="text-xs font-black text-sky-600">{payroll.weekOff}</div>
               </div>
               <div className="px-1">
+                <div className="text-[8px] text-slate-500 font-medium">★ WO Duty</div>
+                <div className="text-xs font-black text-amber-600">{payroll.weekOffDuty}d</div>
+              </div>
+              <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Paid Leaves / PH</div>
                 <div className="text-xs font-black text-blue-600">{payroll.paidLeave + payroll.holidays}</div>
               </div>
               <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Payable Days</div>
-                <div className="text-xs font-black text-emerald-700 bg-emerald-50 rounded">{payroll.payableDays}</div>
+                <div className="text-xs font-black text-emerald-700 bg-emerald-50 rounded">
+                  {payroll.payableDays}
+                  {payroll.weekOffDuty > 0 && (
+                    <span className="text-[8px] text-amber-600 font-bold ml-0.5">(+{payroll.weekOffDuty})</span>
+                  )}
+                </div>
               </div>
               <div className="px-1">
                 <div className="text-[8px] text-slate-500 font-medium">Loss of Pay (LOP)</div>

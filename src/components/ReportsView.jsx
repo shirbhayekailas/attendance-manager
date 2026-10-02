@@ -69,6 +69,7 @@ export default function ReportsView({
     let rangeWeekOff = 0;
     let rangeHoliday = 0;
     let rangeLate = 0;
+    let rangeWeekOffDuty = 0;
     let rangeOvertime = 0;
 
     filteredDates.forEach((d) => {
@@ -82,11 +83,22 @@ export default function ReportsView({
             : 0);
         rangeOvertime += ot;
 
-        if (rec.status === 'present') rangeOffice++;
-        else if (rec.status === 'wfh') rangeWFH++;
+        const dateObj = new Date(d + 'T00:00:00');
+        const isSunday = dateObj.getDay() === 0;
+        const isWODuty = rec.isWeekOffDuty || rec.status === 'week_off_present' || rec.status === 'wo_present' || ((rec.status === 'present' || rec.status === 'late' || rec.status === 'wfh') && isSunday) || /week.?off|sunday|wo/i.test(rec.note || '');
+
+        if (rec.status === 'present') {
+          rangeOffice++;
+          if (isWODuty) rangeWeekOffDuty++;
+        }
+        else if (rec.status === 'wfh') {
+          rangeWFH++;
+          if (isWODuty) rangeWeekOffDuty++;
+        }
         else if (rec.status === 'late') {
           rangeOffice++;
           rangeLate++;
+          if (isWODuty) rangeWeekOffDuty++;
         }
         else if (rec.status === 'half_day') rangeHalfDay++;
         else if (rec.status === 'leave') rangeLeave++;
@@ -95,11 +107,13 @@ export default function ReportsView({
         else if (rec.status === 'holiday' || rec.status === 'ph') rangeHoliday++;
         else if (rec.status === 'week_off_present' || rec.status === 'wo_present') {
           rangeOffice++;
+          rangeWeekOffDuty++;
         }
       }
     });
 
-    const payableDays = rangeOffice + rangeWFH + rangeLeave + rangeWeekOff + rangeHoliday + (rangeHalfDay * 0.5);
+    // Enterprise HRMS Standard (Keka / GreytHR): Working on Week Off adds +1.0 full payable day
+    const payableDays = rangeOffice + rangeWFH + rangeLeave + rangeWeekOff + rangeHoliday + (rangeHalfDay * 0.5) + rangeWeekOffDuty;
     // Dynamic month days division: 30 for 30d month, 31 for 31d month, etc.
     const overallStats = calculateEmployeeStats(emp.id, attendance, emp.salaryMonthly || 100000, currentMonthDays);
     const advanceAmount = getEmployeeTotalAdvance(emp.id, advances);
@@ -117,6 +131,7 @@ export default function ReportsView({
       rangeWeekOff,
       rangeHoliday,
       rangeLate,
+      rangeWeekOffDuty,
       rangeOvertime: Number(rangeOvertime.toFixed(1)),
       payableDays,
       advanceAmount,
@@ -151,6 +166,7 @@ export default function ReportsView({
       'In-Office Days', 
       'WFH Days', 
       'Week Off Days',
+      'WO Duty (WO-P)',
       'Half Days', 
       'Paid Leaves', 
       'LWP (Loss of Pay)', 
@@ -173,6 +189,7 @@ export default function ReportsView({
       e.rangeOffice,
       e.rangeWFH,
       e.rangeWeekOff,
+      e.rangeWeekOffDuty,
       e.rangeHalfDay,
       e.rangeLeave,
       e.rangeAbsent,
@@ -247,7 +264,7 @@ Designation: ${emp.role} | Dept: ${emp.department}
 *Attendance Summary:*
 - Present / WFH: ${emp.rangeOffice + emp.rangeWFH} Days
 - Week Off (WO): ${emp.rangeWeekOff} Days
-- Paid Leave / Holiday: ${emp.rangeLeave + emp.rangeHoliday} Days
+${emp.rangeWeekOffDuty > 0 ? `- ★ Week Off Duty Worked: ${emp.rangeWeekOffDuty} Days (+${emp.rangeWeekOffDuty} Extra Paid Days)\n` : ''}- Paid Leave / Holiday: ${emp.rangeLeave + emp.rangeHoliday} Days
 - Overtime Logged: ${emp.rangeOvertime} hrs
 - Total Payable Days: ${emp.payableDays} / ${emp.rangeTotal}
 
@@ -497,6 +514,7 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
                   <th className="py-3.5 px-4 text-center">In Office</th>
                   <th className="py-3.5 px-4 text-center">WFH</th>
                   <th className="py-3.5 px-4 text-center text-sky-600 dark:text-sky-400">Week Off</th>
+                  <th className="py-3.5 px-4 text-center text-amber-600 dark:text-amber-400" title="Week Off Duty Worked (+1 Extra Paid Day)">★ WO Duty</th>
                   <th className="py-3.5 px-4 text-center">Paid Leaves</th>
                   <th className="py-3.5 px-4 text-center">LWP</th>
                   <th className="py-3.5 px-4 text-center">OT Hours</th>
@@ -542,6 +560,19 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
                       {emp.rangeWeekOff}d
                     </td>
 
+                    <td className="py-3 px-4 text-center">
+                      {emp.rangeWeekOffDuty > 0 ? (
+                        <span 
+                          className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs font-black bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800/60"
+                          title={`${emp.rangeWeekOffDuty} Week Off Days Worked (+${emp.rangeWeekOffDuty} Paid Days)`}
+                        >
+                          ★ {emp.rangeWeekOffDuty}d
+                        </span>
+                      ) : (
+                        <span className="text-slate-400 font-medium">-</span>
+                      )}
+                    </td>
+
                     <td className="py-3 px-4 text-center font-bold text-purple-500">
                       {emp.rangeLeave + emp.rangeHoliday}d
                     </td>
@@ -557,6 +588,11 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
                     <td className="py-3 px-4 text-center">
                       <span className="px-2.5 py-1 rounded-full text-xs font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">
                         {emp.payableDays} / {emp.rangeTotal}d
+                        {emp.rangeWeekOffDuty > 0 && (
+                          <span className="text-[10px] text-amber-700 dark:text-amber-300 ml-1 font-bold">
+                            (+{emp.rangeWeekOffDuty})
+                          </span>
+                        )}
                       </span>
                     </td>
 

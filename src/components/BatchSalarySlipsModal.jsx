@@ -188,14 +188,19 @@ export default function BatchSalarySlipsModal({
                 </div>
 
                 {/* Attendance Summary */}
-                <div className="grid grid-cols-7 divide-x divide-slate-300 border border-slate-300 rounded-xl text-center bg-white py-1.5 text-xs">
+                <div className="grid grid-cols-8 divide-x divide-slate-300 border border-slate-300 rounded-xl text-center bg-white py-1.5 text-xs">
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Month Days</div>
                     <div className="font-black text-slate-900 text-sm">{payroll.daysInMonth}</div>
                   </div>
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Payable Days</div>
-                    <div className="font-black text-emerald-600 text-sm">{payroll.payableDays}</div>
+                    <div className="font-black text-emerald-600 text-sm">
+                      {payroll.payableDays}
+                      {payroll.weekOffDuty > 0 && (
+                        <span className="text-[9px] text-amber-600 font-bold ml-0.5">(+{payroll.weekOffDuty})</span>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Office / WFH</div>
@@ -204,6 +209,10 @@ export default function BatchSalarySlipsModal({
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Week Off (WO)</div>
                     <div className="font-bold text-sky-600">{payroll.weekOff}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-slate-500 font-bold uppercase">★ WO Duty</div>
+                    <div className="font-bold text-amber-600">{payroll.weekOffDuty}d</div>
                   </div>
                   <div>
                     <div className="text-[9px] text-slate-500 font-bold uppercase">Leaves / PH</div>

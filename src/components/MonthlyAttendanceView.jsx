@@ -206,26 +206,47 @@ export default function MonthlyAttendanceView({
     let absent = 0;
     let weekOff = 0;
     let holiday = 0;
+    let weekOffDuty = 0;
     let totalOt = 0;
 
-    monthDays.forEach(({ dateStr, isWeekend }) => {
+    monthDays.forEach(({ dateStr, isWeekend, dayOfWeek }) => {
       const rec = attendance[dateStr]?.[empId];
+      const isSunday = dayOfWeek === 0;
+
       if (rec?.status) {
-        if (rec.status === 'present' || rec.status === 'week_off_present' || rec.status === 'wo_present') office++;
+        const isWODuty = rec.status === 'week_off_present' || rec.status === 'wo_present' || rec.isWeekOffDuty || (rec.status === 'present' && isSunday);
+        
+        if (rec.status === 'present') {
+          office++;
+          if (isWODuty) weekOffDuty++;
+        }
+        else if (rec.status === 'week_off_present' || rec.status === 'wo_present') {
+          office++;
+          weekOffDuty++;
+        }
         else if (rec.status === 'wfh') wfh++;
-        else if (rec.status === 'late') { office++; late++; }
+        else if (rec.status === 'late') { 
+          office++; 
+          late++; 
+          if (isWODuty) weekOffDuty++;
+        }
         else if (rec.status === 'half_day') halfDay++;
         else if (rec.status === 'leave') leave++;
         else if (rec.status === 'absent') absent++;
         else if (rec.status === 'week_off' || rec.status === 'wo') weekOff++;
         else if (rec.status === 'holiday' || rec.status === 'ph') holiday++;
+      } else {
+        if (isSunday) {
+          weekOff++;
+        }
       }
       if (rec?.overtimeHours) {
         totalOt += Number(rec.overtimeHours) || 0;
       }
     });
 
-    const payable = office + wfh + leave + weekOff + holiday + (0.5 * halfDay);
+    // Enterprise HRMS Standard: Working on Week Off adds +1.0 full day to total payable days
+    const payable = office + wfh + leave + weekOff + holiday + (0.5 * halfDay) + weekOffDuty;
 
     return {
       office,
@@ -236,6 +257,7 @@ export default function MonthlyAttendanceView({
       absent,
       weekOff,
       holiday,
+      weekOffDuty,
       totalOt: Number(totalOt.toFixed(1)),
       payable,
     };
@@ -538,6 +560,9 @@ export default function MonthlyAttendanceView({
                 <th className="p-2 text-center font-bold text-emerald-600 dark:text-emerald-400 min-w-[38px] bg-emerald-50/50 dark:bg-emerald-950/20" title="Office Present">
                   P
                 </th>
+                <th className="p-2 text-center font-bold text-emerald-800 dark:text-emerald-300 min-w-[46px] bg-emerald-100/60 dark:bg-emerald-950/50 border-x border-emerald-300 dark:border-emerald-800" title="Week Off Duty Worked (WO-P • +1 Extra Paid Day)">
+                  ★ WO-P
+                </th>
                 <th className="p-2 text-center font-bold text-indigo-600 dark:text-indigo-400 min-w-[38px] bg-indigo-50/50 dark:bg-indigo-950/20" title="Work From Home">
                   W
                 </th>
@@ -553,7 +578,7 @@ export default function MonthlyAttendanceView({
                 <th className="p-2 text-center font-bold text-amber-600 dark:text-amber-400 min-w-[42px] bg-amber-50/50 dark:bg-amber-950/20" title="Total Overtime Hours">
                   OT
                 </th>
-                <th className="p-2.5 text-center font-black text-slate-900 dark:text-white min-w-[65px] bg-slate-100/70 dark:bg-slate-800/70" title="Total Payable Days">
+                <th className="p-2.5 text-center font-black text-slate-900 dark:text-white min-w-[70px] bg-slate-100/70 dark:bg-slate-800/70" title="Total Payable Days (Includes +1 Day for each WO Duty worked)">
                   Payable
                 </th>
               </tr>
@@ -685,6 +710,15 @@ export default function MonthlyAttendanceView({
                       <td className="p-2 text-center font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50/30 dark:bg-emerald-950/10">
                         {stats.office}
                       </td>
+                      <td className="p-2 text-center font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-100/40 dark:bg-emerald-950/30 border-x border-emerald-200/60 dark:border-emerald-800/60" title="Week Off Duty Worked">
+                        {stats.weekOffDuty > 0 ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black shadow-2xs">
+                            {stats.weekOffDuty}d
+                          </span>
+                        ) : (
+                          <span className="text-slate-300 dark:text-slate-600 font-mono text-xs">0</span>
+                        )}
+                      </td>
                       <td className="p-2 text-center font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50/30 dark:bg-indigo-950/10">
                         {stats.wfh}
                       </td>
@@ -701,7 +735,14 @@ export default function MonthlyAttendanceView({
                         {stats.totalOt > 0 ? `${stats.totalOt}h` : '-'}
                       </td>
                       <td className="p-2.5 text-center font-black text-slate-900 dark:text-white bg-slate-100/50 dark:bg-slate-800/40">
-                        {stats.payable}d
+                        <span className={stats.weekOffDuty > 0 ? "text-emerald-600 dark:text-emerald-400 font-black" : ""}>
+                          {stats.payable}d
+                        </span>
+                        {stats.weekOffDuty > 0 && (
+                          <span className="block text-[8.5px] font-black text-emerald-600 dark:text-emerald-400">
+                            (+{stats.weekOffDuty} WO-P)
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );
