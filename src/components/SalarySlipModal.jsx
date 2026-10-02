@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { 
   X, 
   Printer, 
-  ShieldCheck, 
   FileText,
   CheckCircle2,
   MessageCircle,
@@ -570,38 +569,24 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
             )}
           </div>
 
-          {/* Signatures & Official Corporate Stamp */}
-          <div className="pt-2 border-t border-slate-300 grid grid-cols-3 gap-6 items-end text-center">
+          {/* Signatures & Physical Stamp Area */}
+          <div className="pt-3 border-t border-slate-300 grid grid-cols-2 gap-12 items-end">
             
             {/* Employee Signature */}
-            <div className="space-y-2">
-              <div className="h-6 border-b border-dashed border-slate-400 mx-6"></div>
+            <div className="space-y-2 text-center">
+              <div className="h-14 flex items-end justify-center">
+                <div className="w-48 border-b border-dashed border-slate-400"></div>
+              </div>
               <div>
                 <p className="text-[10px] font-bold text-slate-900 leading-tight">{employee.name}</p>
                 <p className="text-[8px] text-slate-400 uppercase font-semibold">Employee Signature</p>
               </div>
             </div>
 
-            {/* Official Company Seal */}
-            <div className="flex flex-col items-center justify-center">
-              <div className="w-12 h-12 rounded-full border-2 border-blue-900/60 flex flex-col items-center justify-center text-blue-950 p-1 rotate-[-6deg] bg-blue-50/50">
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-900" />
-                <span className="text-[6.5px] font-black uppercase tracking-widest text-center mt-0.5 leading-none">
-                  {config.companyName ? config.companyName.split(' ')[0] : 'SK'}
-                </span>
-                <span className="text-[5px] font-mono text-slate-600 leading-none">COMPANY SEAL</span>
-              </div>
-              <span className="text-[8px] text-slate-400 mt-0.5 uppercase font-semibold">Company Seal</span>
-            </div>
-
-            {/* HR / Finance Authorized Signatory */}
-            <div className="space-y-1">
-              <div className="h-6 flex items-center justify-center">
-                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wide">
-                  For {config.companyName || 'SK ENTERPRISES'}
-                </span>
-              </div>
-              <div className="border-t border-slate-400 pt-0.5 mx-4">
+            {/* HR / Finance Authorized Signatory (Clean space for Physical Rubber Stamp & Ink Signature) */}
+            <div className="space-y-2 text-center">
+              <div className="h-14"></div>
+              <div className="w-56 mx-auto border-t border-slate-700 pt-1">
                 <p className="text-[10px] font-bold text-slate-900 leading-tight">Authorized Signatory</p>
                 <p className="text-[8px] text-slate-400 uppercase font-semibold">HR &amp; Finance Department</p>
               </div>

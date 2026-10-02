@@ -531,25 +531,19 @@ export default function HRLettersView({ employees = [], config, onSaveToast }) {
 
             </div>
 
-            {/* Signature & Stamp Footer */}
+            {/* Signature & Physical Stamp Footer */}
             <div className="border-t border-slate-300 pt-6 mt-6 font-sans text-xs">
               <div className="flex justify-between items-end">
                 <div className="space-y-1">
-                  <p className="text-[11px] text-slate-500">Authorized Signatory</p>
-                  <div className="w-24 h-10 border-b border-dashed border-slate-400 flex items-end">
-                    <span className="text-[10px] font-mono text-slate-400 italic">Sign / Stamp</span>
+                  <div className="h-16"></div>
+                  <div className="w-56 border-t border-slate-700 pt-1">
+                    <p className="text-[11px] font-bold text-slate-900">Authorized Signatory</p>
+                    <p className="text-[10px] text-slate-500">Director / Head of Human Resources</p>
                   </div>
-                  <p className="font-black text-slate-900 mt-1 uppercase text-xs">
-                    FOR {companyName}
-                  </p>
-                  <p className="text-[10px] text-slate-500">Director / Head of Human Resources</p>
                 </div>
 
-                <div className="text-right space-y-1">
-                  <div className="w-20 h-20 rounded-full border-2 border-dashed border-blue-600/30 flex items-center justify-center mx-auto text-blue-700 font-bold text-[9px] uppercase tracking-wider text-center rotate-[-12deg] p-1">
-                    Official SK Seal
-                  </div>
-                  <p className="text-[9px] text-slate-400">Computer Generated Document</p>
+                <div className="text-right space-y-1 text-slate-400 text-[10px]">
+                  <p>Computer Generated Document</p>
                 </div>
               </div>
             </div>
