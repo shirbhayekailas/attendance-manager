@@ -19,6 +19,7 @@ import {
   PenTool
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
+import html2pdf from 'html2pdf.js';
 
 export default function HRLettersView({ employees = [], config, onSaveToast }) {
   const [letterType, setLetterType] = useState('offer'); // 'offer' | 'experience' | 'increment' | 'verification' | 'warning'
@@ -94,9 +95,35 @@ export default function HRLettersView({ employees = [], config, onSaveToast }) {
     }
   ];
 
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
   const handlePrint = () => {
     sounds.playSuccess();
     window.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      sounds.playSuccess();
+      setIsGeneratingPdf(true);
+      const element = document.getElementById('printable-hr-letter');
+      if (!element) return;
+
+      const opt = {
+        margin: [8, 10, 8, 10],
+        filename: `HR_${letterType.toUpperCase()}_Letter_${(selectedEmp?.name || 'Employee').replace(/\s+/g, '_')}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('PDF error', err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleShareWhatsApp = () => {
@@ -165,17 +192,26 @@ export default function HRLettersView({ employees = [], config, onSaveToast }) {
         <div className="flex items-center gap-2">
           <button
             onClick={handleShareWhatsApp}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all active:scale-95"
           >
             <MessageCircle className="w-4 h-4" />
             <span>Send WhatsApp</span>
           </button>
           <button
+            onClick={handleDownloadPDF}
+            disabled={isGeneratingPdf}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition-all active:scale-95 disabled:opacity-50"
+            title="Download verified HR letter as PDF"
+          >
+            <Download className="w-4 h-4" />
+            <span>{isGeneratingPdf ? 'Saving PDF...' : 'Download PDF'}</span>
+          </button>
+          <button
             onClick={handlePrint}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md shadow-blue-600/25 transition-all active:scale-95"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-black text-xs shadow-md shadow-blue-600/25 transition-all active:scale-95"
           >
             <Printer className="w-4 h-4" />
-            <span>Print Official A4 Letter</span>
+            <span>Print Official A4</span>
           </button>
         </div>
       </div>
@@ -358,7 +394,7 @@ export default function HRLettersView({ employees = [], config, onSaveToast }) {
 
         {/* Right Column: Live Printable Document Sheet Canvas */}
         <div className="lg:col-span-7">
-          <div className="letter-canvas bg-white text-slate-900 p-8 sm:p-12 rounded-3xl border border-slate-300 shadow-xl min-h-[780px] flex flex-col justify-between font-serif text-[13px] leading-relaxed">
+          <div id="printable-hr-letter" className="letter-canvas bg-white text-slate-900 p-8 sm:p-12 rounded-3xl border border-slate-300 shadow-xl min-h-[780px] flex flex-col justify-between font-serif text-[13px] leading-relaxed">
             
             {/* Header: Official SK ENTERPRISES Corporate Letterhead */}
             <div className="border-b-2 border-slate-900 pb-4 mb-6">

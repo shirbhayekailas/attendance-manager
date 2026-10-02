@@ -15,7 +15,8 @@ import {
   ChevronRight,
   Sparkles,
   Layers,
-  UserPlus
+  UserPlus,
+  Download
 } from 'lucide-react';
 import { 
   calculateEmployeeStats, 
@@ -23,6 +24,7 @@ import {
   getCompanyRecentTrend 
 } from '../utils/attendanceCalculations';
 import { sounds } from '../utils/sound';
+import { exportCorporateBackup } from '../utils/storage';
 
 export default function DashboardView({ 
   employees, 
@@ -141,6 +143,22 @@ export default function DashboardView({
           >
             <Clock className="w-4 h-4 text-blue-400" />
             <span>Biometric Kiosk</span>
+          </button>
+
+          <button
+            onClick={() => {
+              sounds.playSuccess();
+              exportCorporateBackup({
+                employees,
+                attendance,
+                config
+              });
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-2xl text-xs sm:text-sm border border-slate-700 transition-all active:scale-95"
+            title="Download Instant Complete System Backup JSON"
+          >
+            <Download className="w-4 h-4 text-emerald-400" />
+            <span>Quick Backup</span>
           </button>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   CalendarDays, 
   ChevronLeft, 
@@ -16,10 +16,16 @@ import {
   X,
   Sparkles,
   Info,
-  Printer
+  Printer,
+  Fingerprint,
+  Zap,
+  UploadCloud,
+  CheckSquare,
+  Keyboard
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
 import MonthlyRosterModal from './MonthlyRosterModal';
+import BiometricImportModal from './BiometricImportModal';
 
 export default function MonthlyAttendanceView({ 
   employees = [], 
@@ -37,6 +43,81 @@ export default function MonthlyAttendanceView({
   const [selectedDept, setSelectedDept] = useState('All');
   const [editingCell, setEditingCell] = useState(null); // { empId, empName, dateStr, currentStatus }
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
+  const [isBiometricModalOpen, setIsBiometricModalOpen] = useState(false);
+  const [quickStampTool, setQuickStampTool] = useState('inspect'); // 'inspect' | 'present' | 'week_off' | 'absent' | 'half_day' | 'leave' | 'week_off_present' | 'wfh'
+  const [hoveredCell, setHoveredCell] = useState(null); // { empId, dateStr }
+
+  // Quick apply single status
+  const applyQuickStatus = (empId, dateStr, newStatus) => {
+    sounds.playSuccess();
+    const updated = { ...(attendance || {}) };
+    if (!updated[dateStr]) updated[dateStr] = {};
+
+    if (newStatus === 'none') {
+      delete updated[dateStr][empId];
+      if (Object.keys(updated[dateStr]).length === 0) delete updated[dateStr];
+    } else {
+      updated[dateStr][empId] = {
+        ...(updated[dateStr][empId] || {}),
+        status: newStatus,
+        clockIn: newStatus === 'present' ? '09:00' : (newStatus === 'half_day' ? '09:00' : '--'),
+        clockOut: newStatus === 'present' ? '18:00' : (newStatus === 'half_day' ? '13:30' : '--'),
+        isWeekOffDuty: newStatus === 'week_off_present',
+        lastUpdated: new Date().toISOString()
+      };
+    }
+
+    setAttendance(updated);
+  };
+
+  // Keyboard shortcut listener for fast attendance stamping
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) return;
+      if (editingCell || isRosterModalOpen || isBiometricModalOpen) return;
+
+      const key = e.key.toLowerCase();
+      const statusMap = {
+        'p': 'present',
+        'w': 'week_off',
+        'a': 'absent',
+        'h': 'half_day',
+        'l': 'leave',
+        'd': 'week_off_present',
+        'f': 'wfh',
+        'x': 'none'
+      };
+
+      if (statusMap[key] && hoveredCell) {
+        e.preventDefault();
+        applyQuickStatus(hoveredCell.empId, hoveredCell.dateStr, statusMap[key]);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hoveredCell, editingCell, isRosterModalOpen, isBiometricModalOpen, attendance]);
+
+  // Bulk fill an entire date column
+  const handleBulkFillDay = (dateStr, statusToFill) => {
+    sounds.playSuccess();
+    const updated = { ...(attendance || {}) };
+    if (!updated[dateStr]) updated[dateStr] = {};
+
+    filteredEmployees.forEach(emp => {
+      updated[dateStr][emp.id] = {
+        ...(updated[dateStr][emp.id] || {}),
+        status: statusToFill,
+        clockIn: statusToFill === 'present' ? '09:00' : '--',
+        clockOut: statusToFill === 'present' ? '18:00' : '--',
+        isWeekOffDuty: statusToFill === 'week_off_present',
+        lastUpdated: new Date().toISOString()
+      };
+    });
+
+    setAttendance(updated);
+    onSaveToast(`Marked all ${filteredEmployees.length} staff as ${statusToFill.toUpperCase()} on ${dateStr}!`);
+  };
 
   const departments = ['All', ...new Set([
     ...(config?.departments || []),
@@ -398,6 +479,15 @@ export default function MonthlyAttendanceView({
           )}
 
           <button
+            onClick={() => setIsBiometricModalOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 dark:hover:bg-purple-900/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 transition-all active:scale-95 shadow-xs cursor-pointer"
+            title="Import Attendance from Biometric Thumb Scanner CSV or Excel"
+          >
+            <UploadCloud className="w-3.5 h-3.5" />
+            <span>Biometric Sync</span>
+          </button>
+
+          <button
             onClick={() => setIsRosterModalOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-md shadow-blue-500/20 transition-all active:scale-95"
             title="Configure Monthly Shift Roster & Week-Off Presets without deleting existing attendance entries"
@@ -533,6 +623,50 @@ export default function MonthlyAttendanceView({
         </div>
       </div>
 
+      {/* Superfast Attendance Entry Shortcut & Hotkeys Palette */}
+      <div className="no-print bg-slate-900 text-white p-3 px-4 rounded-2xl shadow-md border border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-amber-400 font-black">
+            <Zap className="w-4 h-4 fill-amber-400 text-amber-400" />
+            <span className="uppercase tracking-wider text-[11px]">Quick Stamp Tool:</span>
+          </div>
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 flex-wrap">
+            {[
+              { id: 'inspect', label: 'Edit Popover', key: 'Click', color: 'bg-slate-800 text-white' },
+              { id: 'present', label: 'Present', key: 'P', color: 'bg-emerald-600 text-white' },
+              { id: 'week_off', label: 'Week Off', key: 'W', color: 'bg-sky-600 text-white' },
+              { id: 'absent', label: 'Absent', key: 'A', color: 'bg-rose-600 text-white' },
+              { id: 'half_day', label: 'Half Day', key: 'H', color: 'bg-amber-600 text-white' },
+              { id: 'leave', label: 'Paid Leave', key: 'L', color: 'bg-purple-600 text-white' },
+              { id: 'week_off_present', label: '★ WO Duty', key: 'D', color: 'bg-teal-600 text-white' },
+              { id: 'wfh', label: 'WFH', key: 'F', color: 'bg-indigo-600 text-white' }
+            ].map(tool => (
+              <button
+                key={tool.id}
+                type="button"
+                onClick={() => {
+                  sounds.playSuccess();
+                  setQuickStampTool(tool.id);
+                }}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                  quickStampTool === tool.id 
+                    ? `${tool.color} shadow-sm ring-2 ring-white/50 scale-105` 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                }`}
+              >
+                <span>{tool.label}</span>
+                <kbd className="px-1 py-0.2 rounded bg-black/40 text-[9px] font-mono text-slate-300">[{tool.key}]</kbd>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-[10px] text-slate-400">
+          <Keyboard className="w-3.5 h-3.5 text-blue-400" />
+          <span>Hover cell &amp; press <strong>[P]</strong>, <strong>[W]</strong>, <strong>[A]</strong>, <strong>[H]</strong>, <strong>[L]</strong>, <strong>[D]</strong> for 1-sec punch</span>
+        </div>
+      </div>
+
       {/* Monthly Attendance Matrix Grid Table */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden printable-document">
         <div className="overflow-x-auto">
@@ -547,12 +681,31 @@ export default function MonthlyAttendanceView({
                 {monthDays.map((d) => (
                   <th 
                     key={d.dayNum} 
-                    className={`p-1.5 text-center min-w-[34px] border-r border-slate-200/60 dark:border-slate-800/60 ${
+                    className={`p-1.5 text-center min-w-[34px] border-r border-slate-200/60 dark:border-slate-800/60 group relative cursor-pointer select-none ${
                       d.isWeekend ? 'bg-slate-100/60 dark:bg-slate-800/40 text-slate-400' : ''
                     }`}
                   >
                     <div className="font-mono text-xs">{d.dayNum}</div>
                     <div className="text-[9px] font-normal uppercase text-slate-400">{d.weekdayShort}</div>
+
+                    {/* Column Quick Fill Hover Action */}
+                    <div className="no-print hidden group-hover:flex flex-col absolute left-1/2 -translate-x-1/2 top-full z-30 bg-slate-900 text-white rounded-xl shadow-2xl p-1.5 gap-1 border border-slate-700 min-w-[85px]">
+                      <span className="text-[8px] font-bold text-slate-400 uppercase text-center block">Day {d.dayNum}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleBulkFillDay(d.dateStr, 'present'); }}
+                        className="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-500 text-[9px] font-black text-center cursor-pointer"
+                      >
+                        All Present
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); handleBulkFillDay(d.dateStr, 'week_off'); }}
+                        className="px-1.5 py-0.5 rounded bg-sky-600 hover:bg-sky-500 text-[9px] font-black text-center cursor-pointer"
+                      >
+                        All Week Off
+                      </button>
+                    </div>
                   </th>
                 ))}
 
@@ -629,17 +782,25 @@ export default function MonthlyAttendanceView({
                         return (
                           <td 
                             key={d.dayNum} 
-                            onClick={() => setEditingCell({
-                              empId: emp.id,
-                              empName: emp.name,
-                              dateStr: d.dateStr,
-                              currentStatus: status,
-                              otHours: ot,
-                            })}
+                            onMouseEnter={() => setHoveredCell({ empId: emp.id, dateStr: d.dateStr })}
+                            onMouseLeave={() => setHoveredCell(null)}
+                            onClick={() => {
+                              if (quickStampTool && quickStampTool !== 'inspect') {
+                                applyQuickStatus(emp.id, d.dateStr, quickStampTool);
+                              } else {
+                                setEditingCell({
+                                  empId: emp.id,
+                                  empName: emp.name,
+                                  dateStr: d.dateStr,
+                                  currentStatus: status,
+                                  otHours: ot,
+                                });
+                              }
+                            }}
                             className={`p-1 text-center cursor-pointer transition-transform hover:scale-110 border-r border-slate-100 dark:border-slate-800/60 ${
                               d.isWeekend ? 'bg-slate-50/60 dark:bg-slate-800/20' : ''
-                            }`}
-                            title={`${emp.name} on ${d.dateStr}: ${status.toUpperCase()}${ot > 0 ? ` (+${ot}h Overtime)` : ''} (Click to change)`}
+                            } ${hoveredCell?.empId === emp.id && hoveredCell?.dateStr === d.dateStr ? 'ring-2 ring-blue-500 rounded-lg' : ''}`}
+                            title={`${emp.name} on ${d.dateStr}: ${status.toUpperCase()}${ot > 0 ? ` (+${ot}h Overtime)` : ''} (Click to ${quickStampTool !== 'inspect' ? `mark ${quickStampTool.toUpperCase()}` : 'edit'})`}
                           >
                             <div className="flex flex-col items-center justify-center">
                               {(status === 'week_off_present' || status === 'wo_present' || (status === 'present' && rec?.isWeekOffDuty)) ? (
@@ -945,6 +1106,18 @@ export default function MonthlyAttendanceView({
           onSaveToast={onSaveToast}
           initialYear={selectedYear}
           initialMonth={selectedMonth}
+        />
+      )}
+
+      {/* Biometric Thumb / Face Scanner CSV Import Modal */}
+      {isBiometricModalOpen && (
+        <BiometricImportModal
+          isOpen={isBiometricModalOpen}
+          onClose={() => setIsBiometricModalOpen(false)}
+          employees={employees}
+          attendance={attendance}
+          setAttendance={setAttendance}
+          onSaveToast={onSaveToast}
         />
       )}
 

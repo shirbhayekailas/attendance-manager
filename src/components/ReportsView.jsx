@@ -24,6 +24,7 @@ import SalarySlipModal from './SalarySlipModal';
 import SalaryAdvanceModal from './SalaryAdvanceModal';
 import BatchSalarySlipsModal from './BatchSalarySlipsModal';
 import SiteExpenseModal from './SiteExpenseModal';
+import BulkWhatsAppModal from './BulkWhatsAppModal';
 
 export default function ReportsView({ 
   employees, 
@@ -44,6 +45,7 @@ export default function ReportsView({
   const [advanceTargetEmp, setAdvanceTargetEmp] = useState(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
   const [isBatchSlipsOpen, setIsBatchSlipsOpen] = useState(false);
+  const [isBulkWhatsAppOpen, setIsBulkWhatsAppOpen] = useState(false);
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseTargetEmp, setExpenseTargetEmp] = useState(null);
 
@@ -248,6 +250,76 @@ export default function ReportsView({
     onSaveToast("Exported Bank Salary Transfer File (NEFT / RTGS)!");
   };
 
+  // Official EPFO Unified Portal ECR File Export (.txt with #~# delimiter)
+  const handleExportEpfoEcrTxt = () => {
+    sounds.playSuccess();
+    const rows = displayedEmployees
+      .filter(e => e.statutoryType !== 'non_pf_esic')
+      .map(e => {
+        const uan = e.uanNo || `1014892019${e.id.replace(/\D/g, '') || '28'}`;
+        const name = e.name.toUpperCase();
+        const gross = e.earnedSalary || e.netDisbursal || 0;
+        const epfWages = Math.min(gross, 15000);
+        const epsWages = epfWages;
+        const edliWages = epfWages;
+        const eeShare = Math.min(Math.round(epfWages * 0.12), 1800);
+        const epsShare = Math.round(epsWages * 0.0833);
+        const erShare = Math.max(0, eeShare - epsShare);
+        const ncpDays = e.overallStats?.lopDays || 0;
+        const refund = 0;
+
+        return `${uan}#~#${name}#~#${gross}#~#${epfWages}#~#${epsWages}#~#${edliWages}#~#${eeShare}#~#${epsShare}#~#${erShare}#~#${ncpDays}#~#${refund}`;
+      });
+
+    if (rows.length === 0) {
+      onSaveToast("No PF-eligible staff found for ECR generation!");
+      return;
+    }
+
+    const content = rows.join('\r\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `EPFO_ECR_${(config?.companyName || 'SK_ENTERPRISES').replace(/\s+/g, '_')}_${currentMonthName}_${currentYear}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    onSaveToast("Downloaded EPFO ECR .txt file for portal upload!");
+  };
+
+  // Official ESIC Monthly Return CSV Export
+  const handleExportEsicCsv = () => {
+    sounds.playSuccess();
+    const headers = ['IP Number', 'IP Name', 'No of Days Worked', 'Total Monthly Wages', 'Reason Code', 'Last Working Day'];
+    const rows = displayedEmployees
+      .filter(e => e.statutoryType !== 'non_pf_esic' && (e.earnedSalary <= 21000 || e.esicNo))
+      .map(e => [
+        `"${e.esicNo || ('31' + (e.id.replace(/\D/g, '') || '48291048'))}"`,
+        `"${e.name}"`,
+        e.payableDays,
+        e.earnedSalary || e.netDisbursal || 0,
+        e.payableDays < 20 ? '2' : '0',
+        '""'
+      ]);
+
+    if (rows.length === 0) {
+      onSaveToast("No ESIC eligible staff (gross ≤ ₹21,000) found!");
+      return;
+    }
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const encoded = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.href = encoded;
+    link.download = `ESIC_Monthly_Return_${currentMonthName}_${currentYear}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    onSaveToast("Exported ESIC Monthly Return CSV!");
+  };
+
   // Quick 1-Click WhatsApp Salary Slip Notification
   const handleShareWhatsAppSlip = (emp) => {
     sounds.playSuccess();
@@ -346,6 +418,39 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
             >
               <Building className="w-3.5 h-3.5" />
               <span>Bank NEFT File</span>
+            </button>
+          )}
+
+          {!isManager && (
+            <button
+              onClick={() => setIsBulkWhatsAppOpen(true)}
+              className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/25 transition-all active:scale-95 cursor-pointer"
+              title="Bulk send salary slips to all employees via WhatsApp"
+            >
+              <MessageCircle className="w-3.5 h-3.5" />
+              <span>Bulk WhatsApp Slips</span>
+            </button>
+          )}
+
+          {!isManager && (
+            <button
+              onClick={handleExportEpfoEcrTxt}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-2xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 dark:hover:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800 transition-colors shadow-xs cursor-pointer"
+              title="Download EPFO ECR format text file for EPFO Unified Employer Portal upload"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>EPFO ECR (.txt)</span>
+            </button>
+          )}
+
+          {!isManager && (
+            <button
+              onClick={handleExportEsicCsv}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-2xl bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 transition-colors shadow-xs cursor-pointer"
+              title="Download ESIC Monthly Return CSV for ESIC portal upload"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" />
+              <span>ESIC Return (.csv)</span>
             </button>
           )}
 
@@ -831,6 +936,18 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
           initialEmployee={expenseTargetEmp}
           expenses={expenses}
           setExpenses={setExpenses}
+          onSaveToast={onSaveToast}
+        />
+      )}
+
+      {/* Bulk WhatsApp Payslips Modal */}
+      {isBulkWhatsAppOpen && (
+        <BulkWhatsAppModal
+          isOpen={isBulkWhatsAppOpen}
+          onClose={() => setIsBulkWhatsAppOpen(false)}
+          employees={displayedEmployees}
+          monthYear={`${currentMonthName} ${currentYear}`}
+          config={config}
           onSaveToast={onSaveToast}
         />
       )}

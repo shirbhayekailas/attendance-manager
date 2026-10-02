@@ -6,8 +6,10 @@ import {
   CheckCircle2,
   MessageCircle,
   Share2,
-  Calendar
+  Calendar,
+  Download
 } from 'lucide-react';
+import html2pdf from 'html2pdf.js';
 import { calculateMonthlyPayrollStats } from '../utils/attendanceCalculations';
 import { numberToIndianCurrencyWords } from '../utils/numberToWords';
 import { sounds } from '../utils/sound';
@@ -80,9 +82,35 @@ export default function SalarySlipModal({
   const lastDayDate = new Date(selectedYear, selectedMonth + 1, 0);
   const paymentDate = `${lastDayDate.getDate()} ${payroll.monthName.slice(0, 3)} ${selectedYear}`;
 
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
   const handlePrint = () => {
     sounds.playSuccess();
     window.print();
+  };
+
+  const handleDownloadPDF = async () => {
+    try {
+      sounds.playSuccess();
+      setIsGeneratingPdf(true);
+      const element = document.getElementById('printable-salary-slip');
+      if (!element) return;
+
+      const opt = {
+        margin: [4, 6, 4, 6],
+        filename: `Salary_Slip_${employee.name.replace(/\s+/g, '_')}_${payroll.monthName}_${selectedYear}.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true, logging: false },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+
+      await html2pdf().set(opt).from(element).save();
+    } catch (err) {
+      console.error('PDF error', err);
+      window.print();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleShareWhatsApp = () => {
@@ -255,8 +283,17 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
               <span className="hidden sm:inline">WhatsApp</span>
             </button>
             <button
+              onClick={handleDownloadPDF}
+              disabled={isGeneratingPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition-all disabled:opacity-50 cursor-pointer active:scale-95"
+              title="Download Salary Slip directly as PDF file"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>{isGeneratingPdf ? 'Saving...' : 'PDF'}</span>
+            </button>
+            <button
               onClick={handlePrint}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/25 transition-all"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/25 transition-all cursor-pointer active:scale-95"
             >
               <Printer className="w-3.5 h-3.5" />
               <span>Print A4</span>
@@ -271,7 +308,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
         </div>
 
         {/* Printable Document Sheet (Strictly fitted for single A4 page) */}
-        <div className="salary-slip-page p-5 sm:p-7 md:p-8 bg-white text-slate-900 printable-document">
+        <div id="printable-salary-slip" className="salary-slip-page p-5 sm:p-7 md:p-8 bg-white text-slate-900 printable-document">
           
           {/* Header with Company Logo & Document Identity */}
           <div className="border-b-2 border-slate-900 pb-2.5 mb-2.5">

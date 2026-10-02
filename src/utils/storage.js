@@ -53,6 +53,19 @@ export const defaultCompanyConfig = {
     "Marketing",
     "Product"
   ],
+  shifts: [
+    { id: 'S1', name: 'General Shift', startTime: '09:30 AM', endTime: '06:30 PM', workHours: 9, minHoursFullDay: 8, minHoursHalfDay: 4, graceMinutes: 15, otRateMultiplier: 1.5, isDefault: true },
+    { id: 'S2', name: 'Morning Shift', startTime: '06:00 AM', endTime: '02:00 PM', workHours: 8, minHoursFullDay: 8, minHoursHalfDay: 4, graceMinutes: 10, otRateMultiplier: 1.5, isDefault: false },
+    { id: 'S3', name: 'Evening / Night Shift', startTime: '02:00 PM', endTime: '10:00 PM', workHours: 8, minHoursFullDay: 8, minHoursHalfDay: 4, graceMinutes: 10, otRateMultiplier: 2.0, isDefault: false },
+    { id: 'S4', name: 'Factory 12H Shift', startTime: '08:00 AM', endTime: '08:00 PM', workHours: 12, minHoursFullDay: 11, minHoursHalfDay: 6, graceMinutes: 15, otRateMultiplier: 2.0, isDefault: false }
+  ],
+  overtimeRules: {
+    enabled: true,
+    minOvertimeMinutes: 30,
+    otMultiplierNormal: 1.5,
+    otMultiplierSunday: 2.0,
+    otMultiplierHoliday: 2.0
+  }
 };
 
 export const defaultAdminCreds = {
@@ -180,6 +193,10 @@ export function loadStoredData() {
       departments: (parsedConfig.departments && parsedConfig.departments.length > 0)
         ? parsedConfig.departments
         : defaultCompanyConfig.departments,
+      shifts: (parsedConfig.shifts && parsedConfig.shifts.length > 0)
+        ? parsedConfig.shifts
+        : defaultCompanyConfig.shifts,
+      overtimeRules: parsedConfig.overtimeRules || defaultCompanyConfig.overtimeRules,
     };
 
     return {
@@ -349,20 +366,53 @@ export function wipeAllStoredData() {
   } catch (err) {}
 }
 
-export function exportCorporateBackup(employees, attendance, leaves, config) {
+export function exportCorporateBackup(param1, attendance, leaves, config) {
+  let fullPayload = {};
+  
+  if (param1 && typeof param1 === 'object' && !Array.isArray(param1) && param1.employees) {
+    // Called with single full data bundle object
+    fullPayload = param1;
+  } else {
+    // Called with positional arguments (employees, attendance, leaves, config)
+    fullPayload = {
+      employees: param1,
+      attendance,
+      leaves,
+      config
+    };
+  }
+
+  const cleanEmployees = (fullPayload.employees || []).filter(e => !isDemoEmployee(e));
   const data = {
-    app: "StaffPulse PRO - Corporate HR Suite",
+    version: "2.5",
+    app: "AttendFlow PRO • SK ENTERPRISES HRMS",
     exportDate: new Date().toISOString(),
-    config,
-    employees,
-    attendance,
-    leaves,
+    config: fullPayload.config || defaultCompanyConfig,
+    employees: cleanEmployees,
+    attendance: fullPayload.attendance || {},
+    leaves: fullPayload.leaves || [],
+    advances: fullPayload.advances || [],
+    expenses: fullPayload.expenses || [],
+    holidays: fullPayload.holidays || [],
+    assets: fullPayload.assets || [],
+    performance: fullPayload.performance || [],
+    helpdesk: fullPayload.helpdesk || [],
+    regularizations: fullPayload.regularizations || [],
+    adminCreds: fullPayload.adminCreds || defaultAdminCreds,
+    summary: {
+      totalEmployees: cleanEmployees.length,
+      attendanceDaysLogged: Object.keys(fullPayload.attendance || {}).length,
+      advancesCount: (fullPayload.advances || []).length,
+      leaveRequestsCount: (fullPayload.leaves || []).length
+    }
   };
+
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `staffpulse_backup_${new Date().toISOString().split("T")[0]}.json`;
+  const companySlug = (data.config?.companyName || 'SK_ENTERPRISES').replace(/[^a-zA-Z0-9]/g, '_');
+  a.download = `${companySlug}_COMPLETE_BACKUP_${new Date().toISOString().split("T")[0]}.json`;
   a.click();
   URL.revokeObjectURL(url);
 }

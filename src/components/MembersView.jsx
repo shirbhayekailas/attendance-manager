@@ -854,9 +854,26 @@ export default function MembersView({
                     {/* Shift & Employee Photo (JPG / PNG Direct File Upload) */}
                     <div className="space-y-3 pt-1 border-t border-slate-200 dark:border-slate-700/60">
                       <div>
-                        <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-1">
-                          Shift Schedule
-                        </label>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-bold text-slate-600 dark:text-slate-400">
+                            Shift Schedule
+                          </label>
+                          {config?.shifts && config.shifts.length > 0 && (
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {config.shifts.map(s => (
+                                <button
+                                  key={s.id}
+                                  type="button"
+                                  onClick={() => setFormData({ ...formData, shift: `${s.name} (${s.startTime} - ${s.endTime})` })}
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 hover:bg-blue-100 hover:text-blue-700 dark:bg-slate-800 dark:hover:bg-blue-950/60 dark:hover:text-blue-300 text-slate-600 dark:text-slate-300 transition-colors"
+                                  title={`${s.name}: ${s.startTime} - ${s.endTime}`}
+                                >
+                                  {s.name.replace(' Shift', '')}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                         <input
                           type="text"
                           value={formData.shift}
