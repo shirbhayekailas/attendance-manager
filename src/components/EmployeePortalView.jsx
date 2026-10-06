@@ -118,7 +118,10 @@ export default function EmployeePortalView({
   });
 
   // Dynamic attendance stats for this employee based on actual days in selected month
-  const stats = calculateEmployeeStats(employee.id, attendance, employee.salaryMonthly || 25000, daysInSelectedMonth);
+  const stats = calculateEmployeeStats(employee.id, attendance, employee.salaryMonthly || 25000, daysInSelectedMonth, selectedYear, selectedMonth);
+
+  // Leave policy applicability (Admin can configure leaveApplicable: false for specific staff)
+  const isLeaveApplicable = employee.leaveApplicable !== false;
 
   // Filtered employee data
   const myLeaves = leaves.filter(l => l.empId === employee.id);
@@ -326,17 +329,19 @@ export default function EmployeePortalView({
             <CalendarDays className="w-3.5 h-3.5" />
             <span>Monthly Sheet</span>
           </button>
-          <button
-            onClick={() => {
-              sounds.playSuccess();
-              setActiveTab('leaves');
-            }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer ${
-              activeTab === 'leaves' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            Leaves ({myLeaves.length})
-          </button>
+          {isLeaveApplicable && (
+            <button
+              onClick={() => {
+                sounds.playSuccess();
+                setActiveTab('leaves');
+              }}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                activeTab === 'leaves' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              Leaves ({myLeaves.length})
+            </button>
+          )}
           <button
             onClick={() => {
               sounds.playSuccess();
@@ -482,7 +487,7 @@ export default function EmployeePortalView({
           </div>
 
           {/* Key Personal Metrics Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div className={`grid ${isLeaveApplicable ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-1 sm:grid-cols-3'} gap-3.5`}>
             <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
               <span className="text-[10px] font-black uppercase text-slate-400">Payable Days</span>
               <div className="mt-1 flex items-baseline gap-1">
@@ -510,16 +515,18 @@ export default function EmployeePortalView({
               <span className="text-[10px] text-slate-400 block mt-1">{stats.late} delayed check-in(s)</span>
             </div>
 
-            <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
-              <span className="text-[10px] font-black uppercase text-slate-400">Leave Balance</span>
-              <div className="mt-1 flex items-baseline gap-1">
-                <span className="text-2xl font-black text-purple-600 dark:text-purple-400">
-                  {(employee.leaveBalance?.cl || 0) + (employee.leaveBalance?.sl || 0)}
-                </span>
-                <span className="text-xs text-slate-400">days left</span>
+            {isLeaveApplicable && (
+              <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm">
+                <span className="text-[10px] font-black uppercase text-slate-400">Leave Balance</span>
+                <div className="mt-1 flex items-baseline gap-1">
+                  <span className="text-2xl font-black text-purple-600 dark:text-purple-400">
+                    {(employee.leaveBalance?.cl || 0) + (employee.leaveBalance?.sl || 0)}
+                  </span>
+                  <span className="text-xs text-slate-400">days left</span>
+                </div>
+                <span className="text-[10px] text-slate-400 block mt-1">CL: {employee.leaveBalance?.cl || 0} | SL: {employee.leaveBalance?.sl || 0}</span>
               </div>
-              <span className="text-[10px] text-slate-400 block mt-1">CL: {employee.leaveBalance?.cl || 0} | SL: {employee.leaveBalance?.sl || 0}</span>
-            </div>
+            )}
           </div>
 
           {/* Personal Activity Heatmap */}
@@ -613,22 +620,44 @@ export default function EmployeePortalView({
         let mLeave = 0;
         let mAbsent = 0;
         let mWeekOff = 0;
+        const weekMap = {};
 
         for (let d = 1; d <= daysInSelectedMonth; d++) {
           const dObj = new Date(selectedYear, selectedMonth, d);
           const dayOfWeek = dObj.getDay();
+          const mondayOffset = (dayOfWeek + 6) % 7;
+          const mondayDate = new Date(selectedYear, selectedMonth, d - mondayOffset);
+          const weekKey = mondayDate.toISOString().split('T')[0];
+          if (!weekMap[weekKey]) weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
+
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
           const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const rec = attendance[dateStr]?.[employee.id];
 
           let status = rec?.status || (isWeekend ? 'weekend' : 'none');
-          if (status === 'present') mOffice++;
-          else if (status === 'wfh') mWfh++;
-          else if (status === 'late') { mOffice++; mLate++; }
-          else if (status === 'half_day') mHalfDay++;
-          else if (status === 'leave') mLeave++;
-          else if (status === 'absent') mAbsent++;
-          else if (status === 'week_off' || status === 'wo') mWeekOff++;
+          if (status === 'present') {
+            mOffice++;
+            if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
+          } else if (status === 'wfh') {
+            mWfh++;
+            if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
+          } else if (status === 'late') {
+            mOffice++;
+            mLate++;
+            if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
+          } else if (status === 'half_day') {
+            mHalfDay++;
+          } else if (status === 'leave') {
+            mLeave++;
+          } else if (status === 'absent') {
+            mAbsent++;
+          } else if (status === 'week_off' || status === 'wo' || status === 'none') {
+            mWeekOff++;
+            if (dayOfWeek === 0) weekMap[weekKey].hasSundayOff = true;
+          } else if (status === 'week_off_present' || status === 'wo_present') {
+            mOffice++;
+            if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
+          }
 
           monthlyDayList.push({
             dayNum: d,
@@ -645,7 +674,14 @@ export default function EmployeePortalView({
           });
         }
 
-        const mPayable = mOffice + mWfh + mLeave + mWeekOff + (0.5 * mHalfDay);
+        let mEarnedWeekOff = 0;
+        Object.values(weekMap).forEach((w) => {
+          if (w.workedDays >= 6 && w.hasSundayOff) {
+            mEarnedWeekOff++;
+          }
+        });
+
+        const mPayable = mOffice + mWfh + mLeave + mEarnedWeekOff + (0.5 * mHalfDay);
         const activeDay = monthlyDayList.find(d => d.dateStr === selectedCalendarDateStr) 
           || monthlyDayList.find(d => d.dateStr === new Date().toISOString().split('T')[0]) 
           || monthlyDayList[0];
@@ -1175,7 +1211,7 @@ export default function EmployeePortalView({
       })()}
 
       {/* TAB 2: MY LEAVES & APPLY LEAVE */}
-      {activeTab === 'leaves' && (
+      {activeTab === 'leaves' && isLeaveApplicable && (
         <div className="no-print space-y-6">
           <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800">
             <div>
@@ -1603,7 +1639,7 @@ export default function EmployeePortalView({
       )}
 
       {/* Apply Leave Modal */}
-      {isApplyLeaveOpen && (
+      {isApplyLeaveOpen && isLeaveApplicable && (
         <div className="no-print fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl p-6 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">

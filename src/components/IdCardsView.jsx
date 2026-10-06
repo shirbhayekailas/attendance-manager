@@ -369,7 +369,9 @@ export default function IdCardsView({
     if (!emp) return null;
     const fallbackAvatar = getInitialsSvgDataUri(emp.name);
     const hasLocalAvatar = emp.avatar && (emp.avatar.startsWith('data:') || emp.avatar.startsWith('blob:'));
-    const avatarUrl = hasLocalAvatar ? emp.avatar : (emp.avatar || fallbackAvatar);
+    const avatarUrl = isPrint 
+      ? (hasLocalAvatar ? emp.avatar : fallbackAvatar)
+      : (hasLocalAvatar ? emp.avatar : (emp.avatar || fallbackAvatar));
     return (
       <div 
         className={`w-[245px] h-[360px] rounded-2xl bg-white text-slate-900 shadow-xl overflow-hidden flex flex-col justify-between border border-slate-300 relative select-none ${isPrint ? 'print-card' : ''}`}
@@ -645,12 +647,12 @@ export default function IdCardsView({
         </div>
       </div>
 
-      {/* Clean Offscreen Container for 100% Reliable PDF & PNG Export (Behind page, zero touch interference) */}
+      {/* Clean Offscreen Container for 100% Reliable PDF & PNG Export (Far offscreen, zero touch interference) */}
       <div 
         style={{ 
           position: 'fixed', 
-          left: 0, 
-          top: 0, 
+          left: '-9999px', 
+          top: '-9999px', 
           width: '560px', 
           zIndex: -9999,
           pointerEvents: 'none',

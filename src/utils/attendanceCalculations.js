@@ -149,10 +149,6 @@ export function calculateMonthlyPayrollStats({
         inOffice++;
         weekOffDuty++;
       }
-    } else {
-      // Unmarked / No entry date:
-      // STRICT: Only count Week-Off as payable when explicitly marked by user (status === 'week_off' || 'wo')!
-      // Do NOT automatically grant 4 week-offs in advance.
     }
 
     dayLogs.push({
@@ -166,16 +162,54 @@ export function calculateMonthlyPayrollStats({
     });
   }
 
+  // 6-Day Work Rule for Paid Week Offs:
+  // An employee earns their weekly off (Sunday) ONLY IF they completed >= 6 working days (Mon-Sat) in that week.
+  // Group days by calendar week (Monday to Sunday)
+  const weekMap = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dObj = new Date(year, month, d);
+    const dayOfWeek = dObj.getDay(); // 0 is Sun, 1 is Mon .. 6 is Sat
+    const mondayOffset = (dayOfWeek + 6) % 7;
+    const mondayDate = new Date(year, month, d - mondayOffset);
+    const weekKey = mondayDate.toISOString().split('T')[0];
+
+    if (!weekMap[weekKey]) {
+      weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
+    }
+
+    const dStr = `${monthPrefix}-${String(d).padStart(2, '0')}`;
+    const r = safeAttendance[dStr]?.[empId];
+    const s = r?.status;
+
+    if (dayOfWeek !== 0) {
+      // Monday to Saturday:
+      if (s === 'present' || s === 'wfh' || s === 'late' || s === 'week_off_present' || s === 'wo_present') {
+        weekMap[weekKey].workedDays++;
+      }
+    } else {
+      // Sunday:
+      if (s === 'week_off' || s === 'wo' || s === 'none') {
+        weekMap[weekKey].hasSundayOff = true;
+      }
+    }
+  }
+
+  let earnedPaidWeekOffs = 0;
+  Object.values(weekMap).forEach((w) => {
+    if (w.workedDays >= 6 && w.hasSundayOff) {
+      earnedPaidWeekOffs++;
+    }
+  });
+
   // 1. Regular Office Days (excluding week off duty which receives 1 regular + 1 bonus day)
   const regularOffice = Math.max(0, inOffice - weekOffDuty);
 
   // 2. Payable Days:
-  // ONLY count weekOff when explicitly marked by user (rec.status === 'week_off' || 'wo')!
-  // Working on Week Off (weekOffDuty) grants 1 day regular work + 1 extra bonus day (+1 paid day)
-  const payableDays = regularOffice + wfh + paidLeave + weekOff + holidays + (halfDay * 0.5) + (weekOffDuty * 2);
+  // Working days (Office + WFH + 0.5*HalfDay) + Paid Leaves + Earned Paid Week-Offs (6-day rule) + Holidays + (WeekOffDuty * 2)
+  const payableDays = regularOffice + wfh + paidLeave + earnedPaidWeekOffs + holidays + (halfDay * 0.5) + (weekOffDuty * 2);
 
   // Standard regular payable days (excluding extra bonus day, for LOP calculation)
-  const standardRegularPayable = regularOffice + wfh + paidLeave + weekOff + holidays + (halfDay * 0.5) + weekOffDuty;
+  const standardRegularPayable = regularOffice + wfh + paidLeave + earnedPaidWeekOffs + holidays + (halfDay * 0.5) + weekOffDuty;
   const lopDays = Math.max(0, daysInMonth - standardRegularPayable);
 
   const lossOfPayDeduction = Math.round(lopDays * perDaySalary);
@@ -243,9 +277,16 @@ export function calculateMonthlyPayrollStats({
   };
 }
 
-export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 100000, totalCycleDays = null) {
+export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 100000, totalCycleDays = null, year = null, month = null) {
   const safeAttendance = attendanceData || {};
-  const dates = Object.keys(safeAttendance).sort();
+  const now = new Date();
+  const targetYear = (typeof year === 'number') ? year : now.getFullYear();
+  const targetMonth = (typeof month === 'number') ? month : now.getMonth();
+  const targetPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+
+  // Filter dates strictly to target month to prevent cross-month leakage
+  const dates = Object.keys(safeAttendance).filter(d => d.startsWith(targetPrefix)).sort();
+
   let totalWorkingDays = 0;
   let inOffice = 0;
   let wfh = 0;
@@ -253,18 +294,31 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
   let halfDay = 0;
   let paidLeave = 0;
   let unpaidAbsent = 0;
-  let weekOff = 0;
   let holidays = 0;
   let weekOffDuty = 0;
   let totalOvertimeHours = 0;
 
   const logs = [];
+  const weekMap = {};
 
   dates.forEach((date) => {
     const record = safeAttendance[date]?.[empId];
     if (record && record.status) {
       totalWorkingDays++;
       const status = record.status;
+
+      const dateObj = new Date(date + 'T00:00:00');
+      const dayOfWeek = dateObj.getDay();
+      const isSun = dayOfWeek === 0;
+
+      // Group by calendar week starting on Monday
+      const mondayOffset = (dayOfWeek + 6) % 7;
+      const mondayDate = new Date(dateObj.getTime() - mondayOffset * 86400000);
+      const weekKey = mondayDate.toISOString().split('T')[0];
+
+      if (!weekMap[weekKey]) {
+        weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
+      }
 
       // Compute actual real working duration from punch in and punch out
       const actualDuration = (record.clockIn && record.clockOut && record.clockIn !== '--' && record.clockOut !== '--')
@@ -277,8 +331,6 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
         : (actualDuration ? actualDuration.overtimeHours : 0);
       totalOvertimeHours += ot;
 
-      const dateObj = new Date(date + 'T00:00:00');
-      const isSun = dateObj.getDay() === 0;
       const isWODuty = record.isWeekOffDuty || isSun || /week.?off|sunday|wo/i.test(record.note || '') || status === "week_off_present" || status === "wo_present";
 
       if (status === "present") {
@@ -302,11 +354,21 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
       } else if (status === "half_day") halfDay++;
       else if (status === "leave") paidLeave++;
       else if (status === "absent") unpaidAbsent++;
-      else if (status === "week_off" || status === "wo") weekOff++;
       else if (status === "holiday" || status === "ph") holidays++;
       else if (status === "week_off_present" || status === "wo_present") {
         inOffice++;
         weekOffDuty++;
+      }
+
+      // Track 6-day work qualification:
+      if (!isSun) {
+        if (status === 'present' || status === 'wfh' || status === 'late' || status === 'week_off_present' || status === 'wo_present') {
+          weekMap[weekKey].workedDays++;
+        }
+      } else {
+        if (status === 'week_off' || status === 'wo' || status === 'none') {
+          weekMap[weekKey].hasSundayOff = true;
+        }
       }
 
       logs.push({
@@ -321,10 +383,16 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
     }
   });
 
-  // Working on a Week-Off adds +1.0 full day to total payable days:
-  // inOffice + wfh + paidLeave + user-marked weekOff + holidays + (halfDay * 0.5) + weekOffDuty
+  // 6-Day Work Rule for Paid Week Offs
+  let earnedPaidWeekOffs = 0;
+  Object.values(weekMap).forEach((w) => {
+    if (w.workedDays >= 6 && w.hasSundayOff) {
+      earnedPaidWeekOffs++;
+    }
+  });
+
   const regularInOffice = Math.max(0, inOffice - weekOffDuty);
-  const payableDays = regularInOffice + wfh + paidLeave + weekOff + holidays + (halfDay * 0.5) + (weekOffDuty * 2);
+  const payableDays = regularInOffice + wfh + paidLeave + earnedPaidWeekOffs + holidays + (halfDay * 0.5) + (weekOffDuty * 2);
 
   // Overall Attendance Percentage
   const attendanceRate = totalWorkingDays > 0 ? Number(((payableDays / totalWorkingDays) * 100).toFixed(1)) : 0;
@@ -363,7 +431,7 @@ export function calculateEmployeeStats(empId, attendanceData = {}, baseSalary = 
     halfDay,
     paidLeave,
     unpaidAbsent,
-    weekOff,
+    weekOff: earnedPaidWeekOffs,
     holidays,
     weekOffDuty,
     totalOvertimeHours: Number(totalOvertimeHours.toFixed(1)),

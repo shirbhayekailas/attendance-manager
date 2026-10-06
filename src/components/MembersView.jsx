@@ -82,6 +82,8 @@ export default function MembersView({
     bankName: 'HDFC Bank Ltd',
     bankAccountNo: '',
     ifscCode: '',
+    leaveApplicable: true,
+    leaveBalance: { cl: 6, sl: 6, pl: 0 },
   });
 
   // Dynamically merge config departments with existing employee departments
@@ -142,6 +144,8 @@ export default function MembersView({
       exitDate: '',
       uanNo: '',
       esicNo: '',
+      leaveApplicable: true,
+      leaveBalance: { cl: 6, sl: 6, pl: 0 },
     });
     setEditingEmployee('new');
   };
@@ -174,6 +178,8 @@ export default function MembersView({
       bankName: emp.bankName || 'HDFC Bank Ltd',
       bankAccountNo: emp.bankAccountNo || '',
       ifscCode: emp.ifscCode || '',
+      leaveApplicable: emp.leaveApplicable !== undefined ? Boolean(emp.leaveApplicable) : true,
+      leaveBalance: emp.leaveBalance || { cl: 6, sl: 6, pl: 0 },
     });
     setEditingEmployee(emp);
   };
@@ -247,6 +253,8 @@ export default function MembersView({
       bankName: formData.bankName || 'HDFC Bank Ltd',
       bankAccountNo: formData.bankAccountNo || '',
       ifscCode: formData.ifscCode || '',
+      leaveApplicable: formData.leaveApplicable !== undefined ? Boolean(formData.leaveApplicable) : true,
+      leaveBalance: formData.leaveBalance || { cl: 6, sl: 6, pl: 0 },
       avatar: finalAvatar,
     };
 
@@ -263,7 +271,8 @@ export default function MembersView({
         joinDate: effectiveJoiningDate,
         joiningDate: effectiveJoiningDate,
         exitDate: effectiveExitDate,
-        leaveBalance: { cl: 8, sl: 5, pl: 12 },
+        leaveApplicable: payload.leaveApplicable,
+        leaveBalance: payload.leaveBalance,
       };
       setEmployees([...employees, newEmp]);
       onSaveToast(`Created ${payload.name} (${payload.accessLevel.toUpperCase()} • ${finalDept} • ${payload.statutoryType === 'non_pf_esic' ? 'Non-PF' : 'PF & ESIC'})!`);
@@ -546,7 +555,11 @@ export default function MembersView({
                   </div>
                   <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/40">
                     <span className="text-[10px] text-slate-400 block">Leaves</span>
-                    <span className="font-bold text-purple-600 dark:text-purple-400">{emp.stats.paidLeave}d</span>
+                    {emp.leaveApplicable === false ? (
+                      <span className="font-bold text-slate-400 text-[11px]" title="Leave policy disabled for this employee">N/A</span>
+                    ) : (
+                      <span className="font-bold text-purple-600 dark:text-purple-400">{emp.stats.paidLeave}d</span>
+                    )}
                   </div>
                 </div>
 
@@ -625,7 +638,7 @@ export default function MembersView({
 
                   {onNavigate && (
                     <button
-                      onClick={() => onNavigate('idcards')}
+                      onClick={() => onNavigate('idcards', emp.id)}
                       className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-purple-700 dark:text-purple-300 bg-purple-50 hover:bg-purple-100 dark:bg-purple-950/60 rounded-xl transition-colors cursor-pointer"
                       title={`Print / Download ID Card for ${emp.name}`}
                     >
@@ -1262,6 +1275,132 @@ export default function MembersView({
                         />
                       </div>
                     </div>
+                  </div>
+
+                  {/* Card 6: Paid Leave Policy Configuration (Admin Only) */}
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 space-y-3.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wide">
+                          6. Paid Leave Policy (Admin Only)
+                        </span>
+                      </div>
+                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase ${
+                        formData.leaveApplicable !== false
+                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300'
+                          : 'bg-slate-200 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                      }`}>
+                        {formData.leaveApplicable !== false ? 'Leaves Applicable' : 'Not Applicable'}
+                      </span>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                      Configure whether this staff member qualifies for annual paid leaves. Setting to "No" completely hides the Leaves tab and leave balance from the employee portal.
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, leaveApplicable: true })}
+                        className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                          formData.leaveApplicable !== false
+                            ? 'bg-purple-50/80 dark:bg-purple-950/50 border-purple-500 shadow-md ring-2 ring-purple-500/20'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            ✓ Applicable (Yes)
+                          </span>
+                          <span className={`w-3 h-3 rounded-full ${formData.leaveApplicable !== false ? 'bg-purple-600' : 'border border-slate-300'}`}></span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 leading-snug">
+                          Employee can view balance &amp; apply for leaves in their portal
+                        </p>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, leaveApplicable: false })}
+                        className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
+                          formData.leaveApplicable === false
+                            ? 'bg-rose-50/80 dark:bg-rose-950/50 border-rose-500 shadow-md ring-2 ring-rose-500/20'
+                            : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            ✗ Not Applicable (No)
+                          </span>
+                          <span className={`w-3 h-3 rounded-full ${formData.leaveApplicable === false ? 'bg-rose-500' : 'border border-slate-300'}`}></span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 leading-snug">
+                          Completely hide Leaves tab &amp; balance card from employee portal
+                        </p>
+                      </button>
+                    </div>
+
+                    {formData.leaveApplicable !== false ? (
+                      <div className="pt-2 border-t border-slate-200 dark:border-slate-700/60 space-y-2">
+                        <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300 block">
+                          Annual Paid Leave Balances (Days)
+                        </span>
+                        <div className="grid grid-cols-3 gap-2.5">
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                              Casual Leave (CL)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={formData.leaveBalance?.cl ?? 6}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                leaveBalance: { ...formData.leaveBalance, cl: parseInt(e.target.value, 10) || 0 }
+                              })}
+                              className="w-full p-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                              Sick Leave (SL)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={formData.leaveBalance?.sl ?? 6}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                leaveBalance: { ...formData.leaveBalance, sl: parseInt(e.target.value, 10) || 0 }
+                              })}
+                              className="w-full p-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">
+                              Privilege (PL)
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={formData.leaveBalance?.pl ?? 0}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                leaveBalance: { ...formData.leaveBalance, pl: parseInt(e.target.value, 10) || 0 }
+                              })}
+                              className="w-full p-2 text-xs font-mono font-bold rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 text-[11px] text-amber-800 dark:text-amber-300">
+                        🔒 Leave policy is disabled. This setting is strictly restricted to Admin. Employee portal me Leaves ka koi option ya balance nahi dikhega.
+                      </div>
+                    )}
                   </div>
 
                 </div>

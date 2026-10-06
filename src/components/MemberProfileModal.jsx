@@ -53,7 +53,7 @@ export default function MemberProfileModal({
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
   const monthName = new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' });
 
-  const stats = calculateEmployeeStats(employee.id, attendance, employee.salaryMonthly || 100000, daysInMonth);
+  const stats = calculateEmployeeStats(employee.id, attendance, employee.salaryMonthly || 100000, daysInMonth, selectedYear, selectedMonth);
 
   // Month navigation
   const handlePrevMonth = () => {
@@ -83,21 +83,41 @@ export default function MemberProfileModal({
   let mLeave = 0;
   let mAbsent = 0;
   let mWeekOff = 0;
+  const weekMap = {};
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dObj = new Date(selectedYear, selectedMonth, d);
     const dayOfWeek = dObj.getDay();
+    const mondayOffset = (dayOfWeek + 6) % 7;
+    const mondayDate = new Date(selectedYear, selectedMonth, d - mondayOffset);
+    const weekKey = mondayDate.toISOString().split('T')[0];
+    if (!weekMap[weekKey]) weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
+
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const rec = attendance[dateStr]?.[employee.id];
 
     let status = rec?.status || (isWeekend ? 'weekend' : 'none');
-    if (status === 'present') mOffice++;
-    else if (status === 'wfh') mWfh++;
-    else if (status === 'late') { mOffice++; mLate++; }
-    else if (status === 'leave') mLeave++;
-    else if (status === 'absent') mAbsent++;
-    else if (status === 'week_off' || status === 'wo') mWeekOff++;
+    if (status === 'present') {
+      mOffice++;
+      if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
+    } else if (status === 'wfh') {
+      mWfh++;
+      if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
+    } else if (status === 'late') {
+      mOffice++; mLate++;
+      if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
+    } else if (status === 'leave') {
+      mLeave++;
+    } else if (status === 'absent') {
+      mAbsent++;
+    } else if (status === 'week_off' || status === 'wo' || status === 'none') {
+      mWeekOff++;
+      if (dayOfWeek === 0) weekMap[weekKey].hasSundayOff = true;
+    } else if (status === 'week_off_present' || status === 'wo_present') {
+      mOffice++;
+      if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
+    }
 
     const otHours = (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
       ? Number(rec.overtimeHours)
@@ -211,6 +231,13 @@ export default function MemberProfileModal({
                       : 'bg-blue-500/30 text-blue-200 border border-blue-400/30'
                   }`}>
                     {employee.statutoryType === 'non_pf_esic' ? 'Non-PF & Non-ESIC' : 'PF & ESIC'}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    employee.leaveApplicable === false
+                      ? 'bg-rose-500/30 text-rose-200 border border-rose-400/30'
+                      : 'bg-teal-500/30 text-teal-200 border border-teal-400/30'
+                  }`}>
+                    {employee.leaveApplicable === false ? 'No Leaves' : 'Leaves OK'}
                   </span>
                 </div>
                 <p className="text-xs text-blue-200 font-semibold">
@@ -342,10 +369,19 @@ export default function MemberProfileModal({
 
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
               <span className="text-[10px] font-bold uppercase text-slate-400">Leaves Balance</span>
-              <div className="mt-1 text-2xl font-black text-purple-600 dark:text-purple-400">
-                {(employee.leaveBalance?.cl || 6) + (employee.leaveBalance?.sl || 4)}d
-              </div>
-              <span className="text-[10px] text-slate-400 block mt-0.5">CL: {employee.leaveBalance?.cl || 6} | SL: {employee.leaveBalance?.sl || 4}</span>
+              {employee.leaveApplicable === false ? (
+                <>
+                  <div className="mt-1 text-sm font-black text-slate-400">Not Applicable</div>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">Exempt from leave scheme</span>
+                </>
+              ) : (
+                <>
+                  <div className="mt-1 text-2xl font-black text-purple-600 dark:text-purple-400">
+                    {(employee.leaveBalance?.cl || 0) + (employee.leaveBalance?.sl || 0)}d
+                  </div>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">CL: {employee.leaveBalance?.cl || 0} | SL: {employee.leaveBalance?.sl || 0}</span>
+                </>
+              )}
             </div>
 
             {/* Overtime Card */}
