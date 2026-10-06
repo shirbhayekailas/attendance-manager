@@ -78,6 +78,7 @@ export default function EmployeePortalView({
   const [selectedYear, setSelectedYear] = useState(todayDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(todayDate.getMonth());
   const [sheetViewMode, setSheetViewMode] = useState('calendar'); // 'calendar' | 'table'
+  const [selectedCalendarDateStr, setSelectedCalendarDateStr] = useState(() => todayDate.toISOString().split('T')[0]);
   const [leaveForm, setLeaveForm] = useState({
     leaveType: 'Casual Leave (CL)',
     startDate: new Date().toISOString().split('T')[0],
@@ -300,14 +301,14 @@ export default function EmployeePortalView({
           </div>
         </div>
 
-        {/* Portal Subtabs */}
-        <div className="flex p-1 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 self-start md:self-center z-10 flex-wrap gap-1">
+        {/* Portal Subtabs - Smooth horizontal scrolling on mobile, centered on desktop */}
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar scroll-smooth flex p-1.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10 z-10 gap-1.5 flex-nowrap shrink-0">
           <button
             onClick={() => {
               sounds.playSuccess();
               setActiveTab('overview');
             }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'overview' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -318,7 +319,7 @@ export default function EmployeePortalView({
               sounds.playSuccess();
               setActiveTab('monthly');
             }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'monthly' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -330,7 +331,7 @@ export default function EmployeePortalView({
               sounds.playSuccess();
               setActiveTab('leaves');
             }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'leaves' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -341,7 +342,7 @@ export default function EmployeePortalView({
               sounds.playSuccess();
               setActiveTab('payslip');
             }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'payslip' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -352,7 +353,7 @@ export default function EmployeePortalView({
               sounds.playSuccess();
               setActiveTab('holidays');
             }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'holidays' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -364,7 +365,7 @@ export default function EmployeePortalView({
               sounds.playSuccess();
               setActiveTab('assets');
             }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'assets' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -376,7 +377,7 @@ export default function EmployeePortalView({
               sounds.playSuccess();
               setActiveTab('helpdesk');
             }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 shrink-0 whitespace-nowrap cursor-pointer ${
               activeTab === 'helpdesk' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -388,7 +389,7 @@ export default function EmployeePortalView({
               sounds.playSuccess();
               setActiveTab('idcard');
             }}
-            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer ${
+            className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
               activeTab === 'idcard' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-300 hover:text-white'
             }`}
           >
@@ -645,6 +646,9 @@ export default function EmployeePortalView({
         }
 
         const mPayable = mOffice + mWfh + mLeave + mWeekOff + (0.5 * mHalfDay);
+        const activeDay = monthlyDayList.find(d => d.dateStr === selectedCalendarDateStr) 
+          || monthlyDayList.find(d => d.dateStr === new Date().toISOString().split('T')[0]) 
+          || monthlyDayList[0];
 
         return (
           <div className="space-y-6">
@@ -811,121 +815,341 @@ export default function EmployeePortalView({
 
             {/* View 1: Calendar Grid View */}
             {sheetViewMode === 'calendar' && (
-              <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3">
-                {/* Weekday Labels (Mon - Sun) */}
-                <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
-                  <span>Mon</span>
-                  <span>Tue</span>
-                  <span>Wed</span>
-                  <span>Thu</span>
-                  <span>Fri</span>
-                  <span className="text-slate-300 dark:text-slate-600">Sat</span>
-                  <span className="text-slate-300 dark:text-slate-600">Sun</span>
-                </div>
+              <div className="bg-white dark:bg-slate-900 p-4 sm:p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+                
+                {/* ================= MOBILE MINI-CALENDAR & TOUCH INSPECTOR (sm:hidden) ================= */}
+                <div className="sm:hidden space-y-3">
+                  <div className="flex items-center justify-between px-1">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-400">
+                      Tap date to view details
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">
+                      {selectedMonthName} {selectedYear}
+                    </span>
+                  </div>
 
-                {/* Calendar Days */}
-                <div className="grid grid-cols-7 gap-2">
-                  {/* Empty offset padding */}
-                  {Array.from({ length: startOffset }).map((_, i) => (
-                    <div key={`pad-${i}`} className="min-h-[85px] rounded-2xl bg-slate-50/40 dark:bg-slate-800/20 opacity-40"></div>
-                  ))}
+                  {/* Weekday Labels (Mon - Sun) */}
+                  <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-400 uppercase tracking-wider pb-1.5 border-b border-slate-100 dark:border-slate-800">
+                    <span>Mon</span>
+                    <span>Tue</span>
+                    <span>Wed</span>
+                    <span>Thu</span>
+                    <span>Fri</span>
+                    <span className="text-slate-300 dark:text-slate-600">Sat</span>
+                    <span className="text-slate-300 dark:text-slate-600">Sun</span>
+                  </div>
 
-                  {monthlyDayList.map((d) => (
-                    <div
-                      key={d.dateStr}
-                      className={`min-h-[85px] p-2.5 rounded-2xl border flex flex-col justify-between transition-all ${
-                        d.status === 'present' ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60' :
-                        d.status === 'wfh' ? 'bg-indigo-50/60 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/60' :
-                        d.status === 'late' ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60' :
-                        d.status === 'half_day' ? 'bg-yellow-50/60 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800/60' :
-                        d.status === 'leave' ? 'bg-purple-50/60 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/60' :
-                        d.status === 'absent' ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/60' :
-                        d.isWeekend ? 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-800 text-slate-400' :
-                        'bg-slate-50/40 dark:bg-slate-800/20 border-slate-100 dark:border-slate-800/60'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">{d.dayNum}</span>
-                        {d.status !== 'none' && d.status !== 'weekend' && (
-                          <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase ${
-                            d.status === 'present' ? 'bg-emerald-500 text-white' :
-                            d.status === 'wfh' ? 'bg-indigo-500 text-white' :
-                            d.status === 'late' ? 'bg-amber-400 text-slate-900' :
-                            d.status === 'leave' ? 'bg-purple-500 text-white' :
-                            'bg-rose-500 text-white'
-                          }`}>
-                            {d.status === 'present' ? 'Office' : d.status.toUpperCase()}
+                  {/* Mobile Compact Day Grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {/* Empty offset padding */}
+                    {Array.from({ length: startOffset }).map((_, i) => (
+                      <div key={`m-pad-${i}`} className="h-11 rounded-xl bg-slate-50/40 dark:bg-slate-800/20 opacity-30"></div>
+                    ))}
+
+                    {monthlyDayList.map((d) => {
+                      const isSelected = activeDay?.dateStr === d.dateStr;
+                      return (
+                        <button
+                          key={`m-${d.dateStr}`}
+                          type="button"
+                          onClick={() => {
+                            sounds.playSuccess();
+                            setSelectedCalendarDateStr(d.dateStr);
+                          }}
+                          className={`h-11 rounded-xl border flex flex-col items-center justify-between py-1 px-0.5 transition-all cursor-pointer active:scale-95 relative ${
+                            isSelected 
+                              ? 'ring-2 ring-blue-600 bg-blue-100/90 dark:bg-blue-900/60 border-blue-500 shadow-sm z-10' 
+                              : d.status === 'present' ? 'bg-emerald-50/50 dark:bg-emerald-950/20 border-emerald-200/60 dark:border-emerald-800/40'
+                              : d.status === 'wfh' ? 'bg-indigo-50/50 dark:bg-indigo-950/20 border-indigo-200/60 dark:border-indigo-800/40'
+                              : d.status === 'late' ? 'bg-amber-50/50 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40'
+                              : d.status === 'half_day' ? 'bg-yellow-50/50 dark:bg-yellow-950/20 border-yellow-200/60 dark:border-yellow-800/40'
+                              : d.status === 'leave' ? 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-200/60 dark:border-purple-800/40'
+                              : d.status === 'absent' ? 'bg-rose-50/50 dark:bg-rose-950/20 border-rose-200/60 dark:border-rose-800/40'
+                              : d.isWeekend ? 'bg-slate-50/80 dark:bg-slate-800/30 border-slate-200/50 dark:border-slate-800'
+                              : 'bg-slate-50/40 dark:bg-slate-800/20 border-slate-100 dark:border-slate-800/60'
+                          }`}
+                        >
+                          <span className={`font-mono text-xs font-bold leading-tight ${isSelected ? 'text-blue-600 dark:text-blue-300 font-black' : 'text-slate-800 dark:text-slate-200'}`}>
+                            {d.dayNum}
                           </span>
-                        )}
-                        {d.isWeekend && (
-                          <span className="text-[9px] font-bold text-slate-400 uppercase">Off</span>
-                        )}
+
+                          {/* Status Dot */}
+                          <div className="flex items-center justify-center">
+                            {d.status === 'present' ? (
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-900"></span>
+                            ) : d.status === 'wfh' ? (
+                              <span className="w-2 h-2 rounded-full bg-indigo-500 ring-2 ring-indigo-200 dark:ring-indigo-900"></span>
+                            ) : d.status === 'late' ? (
+                              <span className="w-2 h-2 rounded-full bg-amber-400 ring-2 ring-amber-200 dark:ring-amber-900"></span>
+                            ) : d.status === 'half_day' ? (
+                              <span className="w-2 h-2 rounded-full bg-yellow-400 ring-2 ring-yellow-200 dark:ring-yellow-900"></span>
+                            ) : d.status === 'leave' ? (
+                              <span className="w-2 h-2 rounded-full bg-purple-500 ring-2 ring-purple-200 dark:ring-purple-900"></span>
+                            ) : d.status === 'absent' ? (
+                              <span className="w-2 h-2 rounded-full bg-rose-500 ring-2 ring-rose-200 dark:ring-rose-900"></span>
+                            ) : d.isWeekend ? (
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+                            ) : (
+                              <span className="w-1.5 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 opacity-40"></span>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Calendar Status Legend */}
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800 flex-wrap gap-2 px-1">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span> Office</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-500"></span> WFH</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span> Late</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500"></span> Leave</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500"></span> Absent</span>
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600"></span> Off</span>
+                  </div>
+
+                  {/* Selected Day Inspection Card (Mobile Only) */}
+                  {activeDay && (
+                    <div className="mt-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700/80 shadow-xs space-y-2.5">
+                      <div className="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700 pb-2">
+                        <div>
+                          <span className="text-[9px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider block">Day Details</span>
+                          <span className="text-xs font-black text-slate-900 dark:text-white">
+                            {new Date(activeDay.dateStr).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                          </span>
+                        </div>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          activeDay.status === 'present' ? 'bg-emerald-500 text-white shadow-xs' :
+                          activeDay.status === 'wfh' ? 'bg-indigo-500 text-white shadow-xs' :
+                          activeDay.status === 'late' ? 'bg-amber-400 text-slate-900' :
+                          activeDay.status === 'half_day' ? 'bg-yellow-400 text-slate-900' :
+                          activeDay.status === 'leave' ? 'bg-purple-500 text-white' :
+                          activeDay.status === 'absent' ? 'bg-rose-500 text-white' :
+                          activeDay.isWeekend ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300' :
+                          'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                        }`}>
+                          {activeDay.status === 'present' ? 'Office' :
+                           activeDay.status === 'wfh' ? 'WFH' :
+                           activeDay.status === 'late' ? 'Late Punch' :
+                           activeDay.status === 'half_day' ? 'Half Day' :
+                           activeDay.status === 'leave' ? 'Leave' :
+                           activeDay.status === 'absent' ? 'Absent' :
+                           activeDay.isWeekend ? 'Week Off' : 'No Log'}
+                        </span>
                       </div>
 
-                      {/* Timestamps */}
-                      {d.clockIn && d.clockIn !== '--' ? (
-                        <div className="text-[10px] space-y-0.5 pt-1">
-                          <div className="font-mono text-slate-600 dark:text-slate-300 font-bold truncate">
-                            {d.clockIn.split(' ')[0]} - {d.clockOut ? d.clockOut.split(' ')[0] : '--'}
-                          </div>
-                          {d.workingHours && d.workingHours !== '--' && (
-                            <span className="text-[9px] text-slate-400 block truncate">{d.workingHours}</span>
-                          )}
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Punch IN</span>
+                          <span className="font-mono text-xs font-black text-slate-900 dark:text-white">
+                            {activeDay.clockIn && activeDay.clockIn !== '--' ? activeDay.clockIn : '--'}
+                          </span>
                         </div>
-                      ) : (
-                        <div className="text-[10px] text-slate-400 italic">--</div>
+                        <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Punch OUT</span>
+                          <span className="font-mono text-xs font-black text-slate-900 dark:text-white">
+                            {activeDay.clockOut && activeDay.clockOut !== '--' ? activeDay.clockOut : '--'}
+                          </span>
+                        </div>
+                        <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200/60 dark:border-slate-700">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase block">Duration</span>
+                          <span className="font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">
+                            {activeDay.workingHours && activeDay.workingHours !== '--' ? activeDay.workingHours : '--'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {activeDay.note && (
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-900/80 p-2 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                          <span className="font-bold text-slate-700 dark:text-slate-300">Remark:</span> {activeDay.note}
+                        </div>
                       )}
                     </div>
-                  ))}
+                  )}
                 </div>
+
+                {/* ================= DESKTOP FULL CALENDAR (hidden sm:block) ================= */}
+                <div className="hidden sm:block space-y-3">
+                  {/* Weekday Labels (Mon - Sun) */}
+                  <div className="grid grid-cols-7 gap-2 text-center text-xs font-bold text-slate-400 uppercase tracking-wider pb-2 border-b border-slate-100 dark:border-slate-800">
+                    <span>Mon</span>
+                    <span>Tue</span>
+                    <span>Wed</span>
+                    <span>Thu</span>
+                    <span>Fri</span>
+                    <span className="text-slate-300 dark:text-slate-600">Sat</span>
+                    <span className="text-slate-300 dark:text-slate-600">Sun</span>
+                  </div>
+
+                  {/* Calendar Days */}
+                  <div className="grid grid-cols-7 gap-2">
+                    {/* Empty offset padding */}
+                    {Array.from({ length: startOffset }).map((_, i) => (
+                      <div key={`pad-${i}`} className="min-h-[85px] rounded-2xl bg-slate-50/40 dark:bg-slate-800/20 opacity-40"></div>
+                    ))}
+
+                    {monthlyDayList.map((d) => {
+                      const isSelected = activeDay?.dateStr === d.dateStr;
+                      return (
+                        <div
+                          key={d.dateStr}
+                          onClick={() => {
+                            sounds.playSuccess();
+                            setSelectedCalendarDateStr(d.dateStr);
+                          }}
+                          className={`min-h-[85px] p-2.5 rounded-2xl border flex flex-col justify-between transition-all cursor-pointer overflow-hidden ${
+                            isSelected ? 'ring-2 ring-blue-500 shadow-md ' : ''
+                          }${
+                            d.status === 'present' ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60' :
+                            d.status === 'wfh' ? 'bg-indigo-50/60 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/60' :
+                            d.status === 'late' ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60' :
+                            d.status === 'half_day' ? 'bg-yellow-50/60 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800/60' :
+                            d.status === 'leave' ? 'bg-purple-50/60 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/60' :
+                            d.status === 'absent' ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/60' :
+                            d.isWeekend ? 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-800 text-slate-400' :
+                            'bg-slate-50/40 dark:bg-slate-800/20 border-slate-100 dark:border-slate-800/60'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">{d.dayNum}</span>
+                            {d.status !== 'none' && d.status !== 'weekend' && (
+                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase truncate max-w-[55px] ${
+                                d.status === 'present' ? 'bg-emerald-500 text-white' :
+                                d.status === 'wfh' ? 'bg-indigo-500 text-white' :
+                                d.status === 'late' ? 'bg-amber-400 text-slate-900' :
+                                d.status === 'leave' ? 'bg-purple-500 text-white' :
+                                'bg-rose-500 text-white'
+                              }`}>
+                                {d.status === 'present' ? 'Office' : d.status.toUpperCase()}
+                              </span>
+                            )}
+                            {d.isWeekend && (
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">Off</span>
+                            )}
+                          </div>
+
+                          {/* Timestamps */}
+                          {d.clockIn && d.clockIn !== '--' ? (
+                            <div className="text-[10px] space-y-0.5 pt-1 overflow-hidden">
+                              <div className="font-mono text-slate-600 dark:text-slate-300 font-bold truncate">
+                                {d.clockIn.split(' ')[0]} - {d.clockOut ? d.clockOut.split(' ')[0] : '--'}
+                              </div>
+                              {d.workingHours && d.workingHours !== '--' && (
+                                <span className="text-[9px] text-slate-400 block truncate">{d.workingHours}</span>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-slate-400 italic">--</div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
               </div>
             )}
 
             {/* View 2: Daily Table View */}
             {sheetViewMode === 'table' && (
-              <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold">
-                      <tr>
-                        <th className="p-3.5">Date & Day</th>
-                        <th className="p-3.5">Status</th>
-                        <th className="p-3.5">Punch IN</th>
-                        <th className="p-3.5">Punch OUT</th>
-                        <th className="p-3.5">Working Duration</th>
-                        <th className="p-3.5">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {monthlyDayList.map((d) => (
-                        <tr key={d.dateStr} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/40 ${
-                          d.isWeekend ? 'bg-slate-50/30 dark:bg-slate-800/20' : ''
+              <div className="space-y-3">
+                {/* Mobile Daily Cards Feed (sm:hidden) */}
+                <div className="sm:hidden space-y-2">
+                  {monthlyDayList.map((d) => (
+                    <div 
+                      key={`feed-${d.dateStr}`}
+                      className={`p-3 rounded-2xl border transition-all ${
+                        d.isWeekend 
+                          ? 'bg-slate-50/50 dark:bg-slate-800/20 border-slate-200/60 dark:border-slate-800' 
+                          : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 shadow-xs'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-xs text-slate-900 dark:text-white">
+                            {d.dayNum} {selectedMonthName.slice(0, 3)}
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-400">
+                            ({d.weekday})
+                          </span>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          d.status === 'present' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
+                          d.status === 'wfh' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' :
+                          d.status === 'late' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
+                          d.status === 'half_day' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300' :
+                          d.status === 'leave' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' :
+                          d.status === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
+                          d.isWeekend ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
+                          'bg-slate-100 text-slate-400 dark:bg-slate-800'
                         }`}>
-                          <td className="p-3.5 font-bold text-slate-900 dark:text-white">
-                            {d.dateStr} <span className="text-slate-400 font-normal">({d.weekday})</span>
-                          </td>
-                          <td className="p-3.5">
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
-                              d.status === 'present' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
-                              d.status === 'wfh' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' :
-                              d.status === 'late' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
-                              d.status === 'half_day' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300' :
-                              d.status === 'leave' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' :
-                              d.status === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
-                              d.isWeekend ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
-                              'text-slate-400'
-                            }`}>
-                              {d.status === 'present' ? 'Office' : d.status === 'none' ? 'No Log' : d.status}
-                            </span>
-                          </td>
-                          <td className="p-3.5 font-mono text-slate-600 dark:text-slate-300">{d.clockIn}</td>
-                          <td className="p-3.5 font-mono text-slate-600 dark:text-slate-300">{d.clockOut}</td>
-                          <td className="p-3.5 font-mono font-bold text-slate-800 dark:text-slate-200">{d.workingHours}</td>
-                          <td className="p-3.5 text-slate-400 italic">{d.note || '--'}</td>
+                          {d.status === 'present' ? 'Office' : d.status === 'none' ? 'No Log' : d.status}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800">
+                        <div className="font-mono text-[11px]">
+                          <span className="text-slate-400 text-[10px] mr-1">Punch:</span>
+                          {d.clockIn !== '--' ? `${d.clockIn} - ${d.clockOut}` : '--'}
+                        </div>
+                        <div className="font-mono font-bold text-emerald-600 dark:text-emerald-400 text-[11px]">
+                          {d.workingHours !== '--' ? d.workingHours : ''}
+                        </div>
+                      </div>
+                      {d.note && (
+                        <div className="text-[10px] text-slate-400 italic mt-1">
+                          Remark: {d.note}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Table View (hidden sm:block) */}
+                <div className="hidden sm:block bg-white dark:bg-slate-900 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-800 text-slate-500 font-bold">
+                        <tr>
+                          <th className="p-3.5">Date &amp; Day</th>
+                          <th className="p-3.5">Status</th>
+                          <th className="p-3.5">Punch IN</th>
+                          <th className="p-3.5">Punch OUT</th>
+                          <th className="p-3.5">Working Duration</th>
+                          <th className="p-3.5">Notes</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {monthlyDayList.map((d) => (
+                          <tr key={d.dateStr} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/40 ${
+                            d.isWeekend ? 'bg-slate-50/30 dark:bg-slate-800/20' : ''
+                          }`}>
+                            <td className="p-3.5 font-bold text-slate-900 dark:text-white">
+                              {d.dateStr} <span className="text-slate-400 font-normal">({d.weekday})</span>
+                            </td>
+                            <td className="p-3.5">
+                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                                d.status === 'present' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
+                                d.status === 'wfh' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' :
+                                d.status === 'late' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
+                                d.status === 'half_day' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300' :
+                                d.status === 'leave' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' :
+                                d.status === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
+                                d.isWeekend ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
+                                'text-slate-400'
+                              }`}>
+                                {d.status === 'present' ? 'Office' : d.status === 'none' ? 'No Log' : d.status}
+                              </span>
+                            </td>
+                            <td className="p-3.5 font-mono text-slate-600 dark:text-slate-300">{d.clockIn}</td>
+                            <td className="p-3.5 font-mono text-slate-600 dark:text-slate-300">{d.clockOut}</td>
+                            <td className="p-3.5 font-mono font-bold text-slate-800 dark:text-slate-200">{d.workingHours}</td>
+                            <td className="p-3.5 text-slate-400 italic">{d.note || '--'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}

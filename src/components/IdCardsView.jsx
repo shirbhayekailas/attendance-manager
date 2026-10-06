@@ -56,6 +56,7 @@ export default function IdCardsView({
   const [bloodGroup, setBloodGroup] = useState('B+');
   const [emergencyPhone, setEmergencyPhone] = useState('');
   const [qrCodeMap, setQrCodeMap] = useState({});
+  const [mobilePreviewModal, setMobilePreviewModal] = useState(null);
 
   useEffect(() => {
     if (initialEmpId) {
@@ -151,18 +152,22 @@ export default function IdCardsView({
     window.print();
   };
 
+  const isMobileDevice = () => {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+  };
+
   const handleDownloadSinglePdf = async () => {
     if (!activeEmployee) return;
     try {
       sounds.playSuccess();
       setIsGeneratingPdf(true);
-      // Prefer dedicated clean off-screen element, fall back to on-screen element
       const element = document.getElementById('printable-id-card-export') || document.getElementById('printable-single-id-card');
-      if (!element) return;
+      if (!element) throw new Error('ID card element not found');
 
+      const filename = `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.pdf`;
       const opt = {
         margin: [6, 6, 6, 6],
-        filename: `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.pdf`,
+        filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
           scale: 2, 
@@ -170,17 +175,33 @@ export default function IdCardsView({
           allowTaint: true, 
           logging: false,
           scrollY: 0,
-          scrollX: 0
+          scrollX: 0,
+          windowWidth: 600
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      await html2pdf().set(opt).from(element).save();
+      const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 6000);
+
       onSaveToast(`ID Card PDF downloaded for ${activeEmployee.name}!`);
     } catch (err) {
-      console.warn('PDF error, falling back to print dialog:', err);
-      window.print();
-      onSaveToast('Print / Save as PDF opened as fallback');
+      console.warn('PDF export error:', err);
+      if (!isMobileDevice()) {
+        window.print();
+        onSaveToast('Print / Save as PDF opened as fallback');
+      } else {
+        onSaveToast('PDF generation failed on mobile. Tap "Image (PNG)" to save your card.');
+      }
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -192,7 +213,7 @@ export default function IdCardsView({
       sounds.playSuccess();
       setIsGeneratingPdf(true);
       const element = document.getElementById('printable-id-card-export') || document.getElementById('printable-single-id-card');
-      if (!element) return;
+      if (!element) throw new Error('Card element not found');
 
       const worker = html2pdf().from(element).set({
         html2canvas: { 
@@ -201,22 +222,43 @@ export default function IdCardsView({
           allowTaint: true, 
           logging: false,
           scrollY: 0,
-          scrollX: 0
+          scrollX: 0,
+          windowWidth: 600
         }
       });
       const canvas = await worker.toCanvas();
-      const dataUrl = canvas.toDataURL('image/png');
+      
+      const blob = await new Promise((resolve) => {
+        canvas.toBlob((b) => resolve(b), 'image/png', 1.0);
+      });
+
+      if (!blob) throw new Error('Canvas to Blob failed');
+
+      const filename = `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.png`;
+      const blobUrl = URL.createObjectURL(blob);
+
+      // Open visual save & preview modal for mobile devices
+      setMobilePreviewModal({
+        url: blobUrl,
+        blob: blob,
+        filename: filename,
+        employeeName: activeEmployee.name
+      });
+
+      // Also trigger browser file download via Blob URL
       const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.png`;
+      a.href = blobUrl;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      onSaveToast(`ID Card PNG image saved for ${activeEmployee.name}!`);
+      setTimeout(() => {
+        document.body.removeChild(a);
+      }, 1500);
+
+      onSaveToast(`ID Card image generated for ${activeEmployee.name}!`);
     } catch (err) {
-      console.warn('PNG error, falling back to print dialog:', err);
-      window.print();
-      onSaveToast('Print / Save dialog opened as fallback');
+      console.warn('PNG export error:', err);
+      onSaveToast('Could not save image directly. Please try again.');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -229,9 +271,10 @@ export default function IdCardsView({
       const element = document.getElementById('printable-a4-sheet');
       if (!element) return;
 
+      const filename = `Employee_ID_Cards_A4_Sheet_${new Date().toISOString().split('T')[0]}.pdf`;
       const opt = {
         margin: [4, 4, 4, 4],
-        filename: `Employee_ID_Cards_A4_Sheet_${new Date().toISOString().split('T')[0]}.pdf`,
+        filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
           scale: 1.5, 
@@ -244,12 +287,27 @@ export default function IdCardsView({
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      await html2pdf().set(opt).from(element).save();
+      const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 6000);
+
       onSaveToast('Bulk ID Cards A4 Sheet PDF downloaded!');
     } catch (err) {
-      console.warn('Bulk PDF error, falling back to print dialog:', err);
-      window.print();
-      onSaveToast('Print dialog opened as fallback');
+      console.warn('Bulk PDF error:', err);
+      if (!isMobileDevice()) {
+        window.print();
+        onSaveToast('Print dialog opened as fallback');
+      } else {
+        onSaveToast('Bulk A4 download failed. Please use Single Preview.');
+      }
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -339,7 +397,7 @@ export default function IdCardsView({
                 src={avatarUrl} 
                 alt={emp.name || 'Staff'} 
                 className="w-full h-full object-cover"
-                crossOrigin="anonymous"
+                crossOrigin={avatarUrl && (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) ? 'anonymous' : undefined}
                 onError={(e) => {
                   e.target.onerror = null;
                   e.target.src = fallbackAvatar;
@@ -587,16 +645,19 @@ export default function IdCardsView({
         </div>
       </div>
 
-      {/* Clean Offscreen Container for 100% Reliable PDF & PNG Export */}
+      {/* Clean Offscreen Container for 100% Reliable PDF & PNG Export (Behind page, zero touch interference) */}
       <div 
         style={{ 
-          position: 'absolute', 
-          left: '-9999px', 
+          position: 'fixed', 
+          left: 0, 
           top: 0, 
           width: '560px', 
-          backgroundColor: '#ffffff',
+          zIndex: -9999,
+          pointerEvents: 'none',
+          opacity: 0.01,
           overflow: 'hidden'
         }}
+        aria-hidden="true"
       >
         <div 
           id="printable-id-card-export"
@@ -939,6 +1000,98 @@ export default function IdCardsView({
             </button>
           </div>
 
+        </div>
+      )}
+
+      {/* Mobile Save & Preview Modal (Ensures 100% Download & Long-Press Save on Mobile) */}
+      {mobilePreviewModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-3xl p-5 border border-slate-200 dark:border-slate-800 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Contact className="w-4 h-4 text-purple-600" />
+                <h3 className="font-extrabold text-sm text-slate-900 dark:text-white">
+                  ID Card Generated
+                </h3>
+              </div>
+              <button 
+                onClick={() => setMobilePreviewModal(null)} 
+                className="p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* High-Res Preview Image */}
+            <div className="bg-slate-100 dark:bg-slate-950 p-2 rounded-2xl flex justify-center items-center overflow-hidden border border-slate-200 dark:border-slate-800">
+              <img 
+                src={mobilePreviewModal.url} 
+                alt="Generated ID Card" 
+                className="max-h-64 object-contain rounded-xl shadow-md select-none"
+              />
+            </div>
+
+            {/* Mobile Guidance Tip */}
+            <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center leading-relaxed">
+              📱 <strong>Mobile Tip:</strong> Tap &amp; hold (long-press) the card image above to save directly to Gallery, or use the buttons below:
+            </p>
+
+            {/* Download & Share Actions */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                onClick={() => {
+                  const a = document.createElement('a');
+                  a.href = mobilePreviewModal.url;
+                  a.download = mobilePreviewModal.filename;
+                  document.body.appendChild(a);
+                  a.click();
+                  setTimeout(() => document.body.removeChild(a), 1000);
+                  sounds.playSuccess();
+                  onSaveToast('Downloading ID Card image...');
+                }}
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/30 cursor-pointer active:scale-95"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Save Image</span>
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    if (navigator.share && mobilePreviewModal.blob) {
+                      const file = new File([mobilePreviewModal.blob], mobilePreviewModal.filename, { type: 'image/png' });
+                      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                          files: [file],
+                          title: `${mobilePreviewModal.employeeName} ID Card`,
+                          text: `Official ID Card for ${mobilePreviewModal.employeeName}`
+                        });
+                        sounds.playSuccess();
+                        onSaveToast('ID Card shared successfully!');
+                        return;
+                      }
+                    }
+                    // Fallback direct download
+                    const a = document.createElement('a');
+                    a.href = mobilePreviewModal.url;
+                    a.download = mobilePreviewModal.filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(() => document.body.removeChild(a), 1000);
+                    onSaveToast('Downloading image...');
+                  } catch (err) {
+                    if (err.name !== 'AbortError') {
+                      console.warn(err);
+                    }
+                  }
+                }}
+                className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs shadow-md cursor-pointer active:scale-95"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>Share Card</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

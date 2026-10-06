@@ -96,19 +96,33 @@ export default function SalarySlipModal({
       const element = document.getElementById('printable-salary-slip');
       if (!element) return;
 
+      const filename = `Salary_Slip_${employee.name.replace(/\s+/g, '_')}_${payroll.monthName}_${selectedYear}.pdf`;
       const opt = {
         margin: [4, 6, 4, 6],
-        filename: `Salary_Slip_${employee.name.replace(/\s+/g, '_')}_${payroll.monthName}_${selectedYear}.pdf`,
+        filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
         pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
       };
 
-      await html2pdf().set(opt).from(element).save();
+      const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
+      const blobUrl = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(blobUrl);
+      }, 5000);
     } catch (err) {
       console.error('PDF error', err);
-      window.print();
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (!isMobile) {
+        window.print();
+      }
     } finally {
       setIsGeneratingPdf(false);
     }
