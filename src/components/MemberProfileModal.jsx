@@ -178,53 +178,20 @@ export default function MemberProfileModal({
         </div>
 
         {/* Header */}
-        <div className="p-6 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white relative border-b border-blue-900/50">
-          <div className="absolute top-5 right-5 flex items-center gap-2 no-print">
-            {onNavigate && (
-              <button
-                onClick={() => {
-                  sounds.playSuccess();
-                  onClose();
-                  onNavigate('idcards');
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
-                title="Generate & Print ID Card for this employee"
-              >
-                <Contact className="w-4 h-4" />
-                <span>🪪 ID Card</span>
-              </button>
-            )}
-            <button
-              onClick={() => {
-                sounds.playSuccess();
-                window.print();
-              }}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-              title="Print Employee Dossier"
-            >
-              <Printer className="w-5 h-5" />
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pr-16">
-            <div className="flex items-center gap-4">
+        <div className="p-5 sm:p-6 bg-gradient-to-r from-slate-900 via-blue-950 to-indigo-950 text-white relative border-b border-blue-900/50">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <img 
                 src={employee.avatar || 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150'} 
                 alt={employee.name || 'Employee'} 
-                className="w-16 h-16 rounded-2xl object-cover border-2 border-white/20 shadow-md bg-slate-800"
+                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover border-2 border-white/20 shadow-md bg-slate-800 shrink-0"
                 onError={(e) => {
                   e.target.src = 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150';
                 }}
               />
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-xl font-bold text-white tracking-tight">
+                  <h2 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                     {employee.name || 'Unnamed Employee'}
                   </h2>
                   <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-500/20 text-blue-200 border border-blue-400/30">
@@ -265,35 +232,69 @@ export default function MemberProfileModal({
               </div>
             </div>
 
-            {/* Dossier Tabs */}
-            <div className="flex p-1 bg-white/10 rounded-2xl border border-white/10 self-start sm:self-center text-xs font-bold">
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 self-end sm:self-center no-print">
+              {onNavigate && (
+                <button
+                  onClick={() => {
+                    sounds.playSuccess();
+                    onClose();
+                    onNavigate('idcards', employee.id);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                  title="Generate & Print ID Card for this employee"
+                >
+                  <Contact className="w-4 h-4" />
+                  <span>🪪 ID Card</span>
+                </button>
+              )}
               <button
                 onClick={() => {
                   sounds.playSuccess();
-                  setActiveProfileTab('monthly');
+                  window.print();
                 }}
-                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                  activeProfileTab === 'monthly' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
-                }`}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Print Employee Dossier"
               >
-                <CalendarDays className="w-3.5 h-3.5" />
-                <span>Monthly View</span>
+                <Printer className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
               <button
-                onClick={() => {
-                  sounds.playSuccess();
-                  setActiveProfileTab('heatmap');
-                }}
-                className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
-                  activeProfileTab === 'heatmap' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
-                }`}
+                onClick={onClose}
+                className="p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
               >
-                <Flame className="w-3.5 h-3.5" />
-                <span>12-Wk Heatmap</span>
+                <X className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
             </div>
           </div>
-        </div>
+
+          {/* Dossier Tabs */}
+          <div className="flex p-1 bg-white/10 rounded-2xl border border-white/10 self-start sm:self-center text-xs font-bold mt-4 flex-wrap gap-1">
+            <button
+              onClick={() => {
+                sounds.playSuccess();
+                setActiveProfileTab('monthly');
+              }}
+              className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                activeProfileTab === 'monthly' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Monthly View</span>
+            </button>
+            <button
+              onClick={() => {
+                sounds.playSuccess();
+                setActiveProfileTab('heatmap');
+              }}
+              className={`px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 ${
+                activeProfileTab === 'heatmap' ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-300 hover:text-white'
+              }`}
+            >
+              <Flame className="w-3.5 h-3.5" />
+              <span>12-Wk Heatmap</span>
+            </button>
+            </div>
+          </div>
 
         {/* Scrollable Content */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1">

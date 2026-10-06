@@ -208,11 +208,18 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           .no-print {
             display: none !important;
           }
+          .salary-slip-wrapper {
+            padding: 0 !important;
+            background: transparent !important;
+            overflow: visible !important;
+          }
           .printable-document {
             box-shadow: none !important;
             border: none !important;
+            border-radius: 0 !important;
             width: 100% !important;
             max-width: 100% !important;
+            min-width: 0 !important;
             page-break-inside: avoid !important;
             page-break-before: avoid !important;
             page-break-after: avoid !important;
@@ -302,12 +309,13 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
           </div>
         </div>
 
-        {/* Printable Document Sheet (Strictly fitted for single A4 page) */}
-        <div 
-          id="printable-salary-slip" 
-          className="salary-slip-page p-4 sm:p-5 bg-white text-slate-900 printable-document max-w-[760px] mx-auto text-[10px]"
-          style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
-        >
+        {/* Printable Document Sheet (Strictly fitted for single A4 page with Mobile Horizontal Scroll) */}
+        <div className="salary-slip-wrapper overflow-x-auto w-full p-2 sm:p-4 bg-slate-100/80 dark:bg-slate-950/40">
+          <div 
+            id="printable-salary-slip" 
+            className="salary-slip-page p-4 sm:p-5 bg-white text-slate-900 printable-document min-w-[650px] sm:min-w-0 max-w-[760px] mx-auto text-[10px] shadow-sm rounded-xl"
+            style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}
+          >
           
           {/* Header with Company Logo & Document Identity */}
           <div className="border-b-2 border-slate-900 pb-2 mb-2">
@@ -613,6 +621,7 @@ _Computer-generated salary slip from SK ENTERPRISES._`;
 
           </div>
 
+        </div>
         </div>
 
       </div>

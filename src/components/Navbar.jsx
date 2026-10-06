@@ -307,11 +307,11 @@ export default function Navbar({
                   sounds.playSuccess();
                   onNavigate('idcards');
                 }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 text-xs font-bold transition active:scale-95 shadow-xs cursor-pointer"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 text-xs font-bold transition active:scale-95 shadow-xs cursor-pointer"
                 title="Open Employee ID Card Studio & A4 Bulk Printing"
               >
                 <Contact className="w-3.5 h-3.5" />
-                <span>🪪 ID Cards</span>
+                <span className="hidden sm:inline">ID Cards</span>
               </button>
             )}
 

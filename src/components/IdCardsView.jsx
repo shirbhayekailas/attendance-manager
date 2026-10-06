@@ -721,10 +721,11 @@ export default function IdCardsView({
           </div>
 
           {/* Printable A4 Sheet Container */}
-          <div 
-            id="printable-a4-sheet"
-            className="w-full max-w-[820px] bg-white text-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-300 my-2"
-          >
+          <div className="overflow-x-auto w-full flex justify-center py-2">
+            <div 
+              id="printable-a4-sheet"
+              className="w-full max-w-[820px] min-w-[620px] sm:min-w-0 bg-white text-slate-900 p-6 rounded-3xl shadow-2xl border border-slate-300 my-2"
+            >
             {/* Sheet Header (Excluded from print or subtle) */}
             <div className="text-center pb-4 border-b border-dashed border-slate-200 mb-4">
               <h2 className="text-sm font-black tracking-wider uppercase text-slate-800">
@@ -774,6 +775,7 @@ export default function IdCardsView({
             <div className="text-center pt-6 mt-6 border-t border-dashed border-slate-200 text-[10px] text-slate-400 font-mono">
               SK ENTERPRISES HRMS • ID CARD PRODUCTION SUITE • PAGE 1 OF 1
             </div>
+          </div>
           </div>
 
           <div className="mt-4 flex items-center gap-3">
