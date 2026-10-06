@@ -17,16 +17,30 @@ export function getActiveOrgId() {
   }
 }
 
+// Helper for fetch with strict timeout to prevent any browser freezing
+async function fetchWithTimeout(url, options = {}, timeoutMs = 3500) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+}
+
 // Fetch entire database state from server
 export async function fetchServerSync(customOrgId = null) {
   const orgId = customOrgId || getActiveOrgId();
   try {
-    const res = await fetch(`${API_BASE}/api/sync?orgId=${encodeURIComponent(orgId)}`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/sync?orgId=${encodeURIComponent(orgId)}`, {
       headers: { 
         'Accept': 'application/json',
         'x-org-id': orgId
       },
-    });
+    }, 3500);
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
     const data = await res.json();
     if (data.success) {
@@ -51,14 +65,14 @@ export async function pushServerSync(payload, customOrgId = null) {
 
   isSyncing = true;
   try {
-    const res = await fetch(`${API_BASE}/api/sync`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-org-id': orgId,
       },
       body: JSON.stringify({ ...payload, orgId }),
-    });
+    }, 4000);
 
     if (res.ok) {
       const result = await res.json();
@@ -79,14 +93,14 @@ export async function pushServerSync(payload, customOrgId = null) {
 // Remote Authentication against cloud server
 export async function loginOnServer({ identifier, password, orgId = 'sk_enterprises' }) {
   try {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await fetchWithTimeout(`${API_BASE}/api/auth/login`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-org-id': orgId
       },
       body: JSON.stringify({ identifier, password, orgId })
-    });
+    }, 2500);
     const data = await res.json();
     return data;
   } catch (err) {

@@ -22,9 +22,19 @@ import {
   Grid, 
   CreditCard,
   QrCode as QrCodeIcon,
-  Filter
+  Filter,
+  Image as ImageIcon
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
+
+// Safe inline SVG avatar generator (100% immune to CORS taint & offline errors)
+export function getInitialsSvgDataUri(name, bg = '#1e3a8a') {
+  const parts = String(name || 'Staff').trim().split(/\s+/);
+  const initials = parts.length >= 2 
+    ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+    : (name || 'SP').slice(0, 2).toUpperCase();
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="100%" height="100%" rx="24" fill="${encodeURIComponent(bg)}"/><text x="50%" y="54%" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="62" fill="%23ffffff" dominant-baseline="middle" text-anchor="middle">${initials}</text></svg>`;
+}
 
 export default function IdCardsView({ 
   employees = [], 
@@ -73,12 +83,17 @@ export default function IdCardsView({
     }
   }, [activeEmployee?.id]);
 
-  // Generate QR Codes for all employees
+  // Generate QR Codes for all employees (memoized with data hash to prevent continuous re-generation and CPU lag)
+  const employeesHash = (employees || [])
+    .map(e => `${e.id}_${e.name}_${e.role}_${e.bloodGroup || ''}_${e.emergencyPhone || e.phone || ''}`)
+    .join(';');
+
   useEffect(() => {
     let isMounted = true;
     async function generateAllQRs() {
       const qrs = {};
       for (const emp of employees) {
+        if (!emp?.id) continue;
         const payload = JSON.stringify({
           company: config.companyName || 'SK ENTERPRISES',
           empId: emp.id,
@@ -109,7 +124,7 @@ export default function IdCardsView({
     }
     generateAllQRs();
     return () => { isMounted = false; };
-  }, [employees, config.companyName]);
+  }, [employeesHash, config.companyName]);
 
   const handleSaveEmployeeMeta = () => {
     if (!activeEmployee) return;
@@ -123,7 +138,9 @@ export default function IdCardsView({
       }
       return e;
     });
-    setEmployees(updated);
+    if (setEmployees) {
+      setEmployees(updated);
+    }
     setIsEditingMeta(false);
     sounds.playSuccess();
     onSaveToast(`Updated ID Card details for ${activeEmployee.name}`);
@@ -139,22 +156,67 @@ export default function IdCardsView({
     try {
       sounds.playSuccess();
       setIsGeneratingPdf(true);
-      const element = document.getElementById('printable-single-id-card');
+      // Prefer dedicated clean off-screen element, fall back to on-screen element
+      const element = document.getElementById('printable-id-card-export') || document.getElementById('printable-single-id-card');
       if (!element) return;
 
       const opt = {
-        margin: [5, 5, 5, 5],
+        margin: [6, 6, 6, 6],
         filename: `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2.5, useCORS: true, logging: false },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          allowTaint: true, 
+          logging: false,
+          scrollY: 0,
+          scrollX: 0
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
       await html2pdf().set(opt).from(element).save();
-      onSaveToast(`ID Card downloaded for ${activeEmployee.name}!`);
+      onSaveToast(`ID Card PDF downloaded for ${activeEmployee.name}!`);
     } catch (err) {
-      console.error('PDF error:', err);
-      alert('Failed to generate PDF: ' + err.message);
+      console.warn('PDF error, falling back to print dialog:', err);
+      window.print();
+      onSaveToast('Print / Save as PDF opened as fallback');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  const handleDownloadSinglePng = async () => {
+    if (!activeEmployee) return;
+    try {
+      sounds.playSuccess();
+      setIsGeneratingPdf(true);
+      const element = document.getElementById('printable-id-card-export') || document.getElementById('printable-single-id-card');
+      if (!element) return;
+
+      const worker = html2pdf().from(element).set({
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          allowTaint: true, 
+          logging: false,
+          scrollY: 0,
+          scrollX: 0
+        }
+      });
+      const canvas = await worker.toCanvas();
+      const dataUrl = canvas.toDataURL('image/png');
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      onSaveToast(`ID Card PNG image saved for ${activeEmployee.name}!`);
+    } catch (err) {
+      console.warn('PNG error, falling back to print dialog:', err);
+      window.print();
+      onSaveToast('Print / Save dialog opened as fallback');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -171,15 +233,23 @@ export default function IdCardsView({
         margin: [4, 4, 4, 4],
         filename: `Employee_ID_Cards_A4_Sheet_${new Date().toISOString().split('T')[0]}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, useCORS: true, logging: false },
+        html2canvas: { 
+          scale: 1.5, 
+          useCORS: true, 
+          allowTaint: true, 
+          logging: false,
+          scrollY: 0,
+          scrollX: 0
+        },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
       await html2pdf().set(opt).from(element).save();
       onSaveToast('Bulk ID Cards A4 Sheet PDF downloaded!');
     } catch (err) {
-      console.error('Bulk PDF error:', err);
-      alert('Failed to generate Bulk PDF: ' + err.message);
+      console.warn('Bulk PDF error, falling back to print dialog:', err);
+      window.print();
+      onSaveToast('Print dialog opened as fallback');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -239,7 +309,9 @@ export default function IdCardsView({
   // Single ID Card Component (Front & Back)
   const renderIdCardFront = (emp, isPrint = false) => {
     if (!emp) return null;
-    const avatarUrl = emp.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(emp.name || 'Staff')}&background=1e3a8a&color=fff&size=160&bold=true`;
+    const fallbackAvatar = getInitialsSvgDataUri(emp.name);
+    const hasLocalAvatar = emp.avatar && (emp.avatar.startsWith('data:') || emp.avatar.startsWith('blob:'));
+    const avatarUrl = hasLocalAvatar ? emp.avatar : (emp.avatar || fallbackAvatar);
     return (
       <div 
         className={`w-[245px] h-[360px] rounded-2xl bg-white text-slate-900 shadow-xl overflow-hidden flex flex-col justify-between border border-slate-300 relative select-none ${isPrint ? 'print-card' : ''}`}
@@ -268,6 +340,10 @@ export default function IdCardsView({
                 alt={emp.name || 'Staff'} 
                 className="w-full h-full object-cover"
                 crossOrigin="anonymous"
+                onError={(e) => {
+                  e.target.onerror = null;
+                  e.target.src = fallbackAvatar;
+                }}
               />
             </div>
             <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Verified Active Staff"></span>
@@ -395,6 +471,25 @@ export default function IdCardsView({
   return (
     <div className="space-y-6">
       
+      {/* Print Specific CSS to isolate cards during printing */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait !important;
+            margin: 6mm 8mm !important;
+          }
+          .no-print, nav, aside, header {
+            display: none !important;
+          }
+          .print-card {
+            box-shadow: none !important;
+            border: 1px solid #94a3b8 !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+        }
+      `}</style>
+      
       {/* Top Header Banner */}
       <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -460,6 +555,19 @@ export default function IdCardsView({
             <span>Print</span>
           </button>
 
+          {/* Download Image (PNG) Button - Single mode only */}
+          {viewMode === 'single' && (
+            <button
+              onClick={handleDownloadSinglePng}
+              disabled={isGeneratingPdf}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs shadow-md shadow-purple-600/25 transition cursor-pointer active:scale-95 disabled:opacity-50"
+              title="Save ID Card as high-resolution PNG image directly to your phone/PC"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>Image (PNG)</span>
+            </button>
+          )}
+
           {/* Download PDF Button */}
           <button
             onClick={viewMode === 'single' ? handleDownloadSinglePdf : handleDownloadBulkA4Pdf}
@@ -470,6 +578,35 @@ export default function IdCardsView({
             <Download className="w-3.5 h-3.5" />
             <span>{isGeneratingPdf ? 'Generating...' : viewMode === 'single' ? 'Download PDF' : 'Download A4 PDF'}</span>
           </button>
+        </div>
+      </div>
+
+      {/* Clean Offscreen Container for 100% Reliable PDF & PNG Export */}
+      <div 
+        style={{ 
+          position: 'absolute', 
+          left: '-9999px', 
+          top: 0, 
+          width: '560px', 
+          backgroundColor: '#ffffff',
+          overflow: 'hidden'
+        }}
+      >
+        <div 
+          id="printable-id-card-export"
+          style={{ 
+            width: '560px', 
+            backgroundColor: '#ffffff', 
+            padding: '16px',
+            boxSizing: 'border-box'
+          }}
+        >
+          {activeEmployee && (
+            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
+              {renderIdCardFront(activeEmployee, true)}
+              {renderIdCardBack(activeEmployee, true)}
+            </div>
+          )}
         </div>
       </div>
 

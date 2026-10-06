@@ -52,7 +52,7 @@ export default function EmployeePortalView({
   setRegularizations,
   onSaveToast 
 }) {
-  const employee = {
+  const employee = React.useMemo(() => ({
     id: rawEmployee?.id || 'EMP-101',
     name: rawEmployee?.name || 'Staff Member',
     role: rawEmployee?.role || rawEmployee?.designation || 'Team Member',
@@ -64,7 +64,9 @@ export default function EmployeePortalView({
     leaveBalance: rawEmployee?.leaveBalance || { cl: 12, sl: 8, pl: 15 },
     statutoryType: rawEmployee?.statutoryType || 'standard',
     ...(rawEmployee || {})
-  };
+  }), [rawEmployee]);
+
+  const portalEmployees = React.useMemo(() => [employee], [employee]);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [punchMode, setPunchMode] = useState('office'); // 'office' | 'wfh'
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'monthly' | 'leaves' | 'payslip'
@@ -1342,7 +1344,7 @@ export default function EmployeePortalView({
       {activeTab === 'idcard' && (
         <div className="no-print space-y-4">
           <IdCardsView
-            employees={[employee]}
+            employees={portalEmployees}
             config={config}
             onSaveToast={onSaveToast}
             initialEmpId={employee.id}

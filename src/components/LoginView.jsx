@@ -53,10 +53,64 @@ export default function LoginView({
     }
 
     setIsSubmitting(true);
-
     const activeOrg = 'sk_enterprises';
+    const idLower = idClean.toLowerCase();
+    const cleanPhone = idLower.replace(/[^0-9]/g, '');
 
-    // 1. Try Cloud Server Auth First (Instant Live Sync & Verification)
+    // 1. FAST LOCAL VERIFICATION FIRST (Instant 0ms login, zero hanging)
+    // A. Check if Login ID is Admin / Owner
+    const validAdminPass = adminCreds.password || '1234';
+    const isAdminId = (
+      idLower === 'admin' ||
+      idLower === (adminCreds.id || '').toLowerCase() ||
+      idLower === (adminCreds.email || '').toLowerCase() ||
+      idLower === 'hr' ||
+      idLower === 'owner'
+    );
+
+    if (isAdminId && passClean === validAdminPass) {
+      sounds.playSuccess();
+      onLoginSuccess({
+        role: 'admin',
+        user: {
+          id: 'admin',
+          name: `${config?.companyName || "SK ENTERPRISES"} Owner / Admin`,
+          role: 'Company Administrator',
+          accessLevel: 'admin',
+          email: adminCreds.email || 'admin@company.com'
+        },
+        orgId: activeOrg
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // B. Check if Login ID matches any Employee / Supervisor locally
+    const matchedUser = employees.find(e => 
+      e.id?.toLowerCase() === idLower ||
+      e.email?.toLowerCase() === idLower ||
+      e.loginId?.toLowerCase() === idLower ||
+      e.name?.toLowerCase() === idLower ||
+      (cleanPhone && String(e.phone || '').replace(/[^0-9]/g, '') === cleanPhone)
+    );
+
+    if (matchedUser) {
+      const validUserPass = String(matchedUser.password || matchedUser.pin || '1234');
+      if (passClean === validUserPass) {
+        sounds.playSuccess();
+        const userAccess = matchedUser.accessLevel || 'employee';
+        onLoginSuccess({ 
+          role: userAccess, 
+          user: matchedUser,
+          employee: matchedUser,
+          orgId: activeOrg
+        });
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // 2. CLOUD SERVER VERIFICATION FALLBACK (For accounts created on other devices)
     try {
       const serverRes = await loginOnServer({
         identifier: idClean,
@@ -73,82 +127,27 @@ export default function LoginView({
           orgId: activeOrg,
           companyName: serverRes.companyName || config?.companyName || "SK ENTERPRISES"
         });
+        setIsSubmitting(false);
+        return;
+      } else if (serverRes && serverRes.message) {
+        sounds.playWarning();
+        setErrorMessage(serverRes.message);
+        setIsSubmitting(false);
         return;
       }
     } catch (netErr) {
       console.warn("Server auth check fallback:", netErr);
     }
 
-    // 2. Local Fallback Verification (Dynamic Role Detection via Login ID)
-    const idLower = idClean.toLowerCase();
-
-    // A. Check if Login ID is Admin / Owner
-    const validAdminPass = adminCreds.password || '1234';
-    const isAdminId = (
-      idLower === 'admin' ||
-      idLower === (adminCreds.id || '').toLowerCase() ||
-      idLower === (adminCreds.email || '').toLowerCase() ||
-      idLower === 'hr' ||
-      idLower === 'owner'
-    );
-
-    if (isAdminId) {
-      if (passClean === validAdminPass) {
-        sounds.playSuccess();
-        onLoginSuccess({
-          role: 'admin',
-          user: {
-            id: 'admin',
-            name: `${config?.companyName || "SK ENTERPRISES"} Owner / Admin`,
-            role: 'Company Administrator',
-            accessLevel: 'admin',
-            email: adminCreds.email || 'admin@company.com'
-          },
-          orgId: activeOrg
-        });
-        setIsSubmitting(false);
-        return;
-      } else {
-        sounds.playWarning();
-        setErrorMessage('Galat Password darj kiya gaya hai.');
-        setIsSubmitting(false);
-        return;
-      }
+    // 3. If matched locally but password was wrong
+    if (isAdminId || matchedUser) {
+      sounds.playWarning();
+      setErrorMessage('Galat Password / PIN darj kiya gaya hai.');
+      setIsSubmitting(false);
+      return;
     }
 
-    // B. Check if Login ID is an Employee or Manager in the system
-    const cleanPhone = idLower.replace(/[^0-9]/g, '');
-    const matchedUser = employees.find(e => 
-      e.id?.toLowerCase() === idLower ||
-      e.email?.toLowerCase() === idLower ||
-      e.loginId?.toLowerCase() === idLower ||
-      e.name?.toLowerCase() === idLower ||
-      (cleanPhone && String(e.phone || '').replace(/[^0-9]/g, '') === cleanPhone)
-    );
-
-    if (matchedUser) {
-      const validUserPass = String(matchedUser.password || matchedUser.pin || '1234');
-      if (passClean === validUserPass) {
-        sounds.playSuccess();
-        // Dynamic Role granted automatically according to the employee's assigned accessLevel
-        const userAccess = matchedUser.accessLevel || 'employee'; // 'employee' | 'manager' | 'admin'
-        onLoginSuccess({ 
-          role: userAccess, 
-          user: matchedUser,
-          employee: matchedUser,
-          orgId: activeOrg
-        });
-        setIsSubmitting(false);
-        return;
-      } else {
-        sounds.playWarning();
-        setErrorMessage(`Galat Password / PIN darj kiya gaya hai.`);
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
-    // 3. Login ID not recognized
+    // 4. Login ID not recognized
     sounds.playWarning();
     setIsSubmitting(false);
     setErrorMessage('Login ID nahi mila. Kripya apna Login ID ya Employee ID check karein.');
