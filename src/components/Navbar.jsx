@@ -123,11 +123,11 @@ export default function Navbar({
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b transition-colors duration-200 backdrop-blur-xl bg-white/95 dark:bg-slate-900/95 border-slate-200/80 dark:border-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+    <header className="sticky top-0 z-40 border-b transition-colors duration-200 backdrop-blur-xl bg-white/95 dark:bg-slate-900/95 border-slate-200/80 dark:border-slate-800 shadow-xs">
+      <div className="w-full px-3 sm:px-6">
+        <div className="flex items-center justify-between h-16 gap-2 sm:gap-3">
           
-          {/* Logo & Company Identity */}
+          {/* Left: Brand Identity & Menu */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             {/* Mobile Hamburger Drawer Toggle Button */}
             {(isAdmin || isManager) && onToggleMobileMenu && (
@@ -136,88 +136,132 @@ export default function Navbar({
                   sounds.playSuccess();
                   onToggleMobileMenu();
                 }}
-                className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer"
+                className="md:hidden p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 transition cursor-pointer shrink-0"
                 aria-label="Open Navigation Menu"
               >
                 <Menu className="w-5 h-5" />
               </button>
             )}
 
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-800 flex items-center justify-center text-white shadow-lg shadow-blue-500/25 ring-2 ring-white/10">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-indigo-800 flex items-center justify-center text-white shadow-md shadow-blue-500/25 ring-2 ring-white/10 shrink-0">
               <Building2 className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-lg text-slate-900 dark:text-white tracking-tight">
+            <div className="shrink-0">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="font-black text-base sm:text-lg text-slate-900 dark:text-white tracking-tight">
                   StaffPulse <span className="text-blue-600 dark:text-blue-400 font-extrabold">PRO</span>
                 </span>
-                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-extrabold border ${
+                <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-[9.5px] font-extrabold border shrink-0 ${
                   isAdmin 
                     ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800/60'
                     : isManager
                     ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/60'
                     : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
                 }`}>
-                  {isAdmin ? 'ADMIN CONSOLE' : isManager ? 'MANAGER PORTAL' : 'EMPLOYEE PORTAL'}
+                  {isAdmin ? 'ADMIN' : isManager ? 'MANAGER' : 'PORTAL'}
                 </span>
               </div>
-              <p className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[180px] sm:max-w-xs">
+              <p className="text-[10.5px] font-semibold text-slate-500 dark:text-slate-400 truncate max-w-[140px] sm:max-w-xs">
                 {config.companyName}
               </p>
             </div>
           </div>
 
-          {/* Quick Search Shortcut Bar (Cmd+K style) - Admin/Manager */}
+          {/* Center: Quick Search Shortcut Bar (Cmd+K) */}
           {(isAdmin || isManager) && (
-            <div className="hidden lg:flex flex-1 max-w-sm mx-4">
+            <div className="hidden lg:flex flex-1 max-w-xs mx-2">
               <button
                 onClick={onOpenSearch}
-                className="w-full flex items-center justify-between px-3.5 py-2 text-xs rounded-xl bg-slate-100 hover:bg-slate-200/70 dark:bg-slate-800/80 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/70 dark:border-slate-700/80 transition-all group"
+                className="w-full flex items-center justify-between px-3 py-1.5 text-xs rounded-xl bg-slate-100 hover:bg-slate-200/70 dark:bg-slate-800/80 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200/70 dark:border-slate-700/80 transition-all group shrink-0"
               >
-                <div className="flex items-center gap-2">
-                  <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500" />
-                  <span>Search employee, department, shift...</span>
+                <div className="flex items-center gap-2 truncate">
+                  <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-blue-500 shrink-0" />
+                  <span className="truncate">Search staff, depts...</span>
                 </div>
-                <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-bold bg-white dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 shadow-2xs">
+                <kbd className="px-1.5 py-0.5 text-[9.5px] font-mono font-bold bg-white dark:bg-slate-700 rounded border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 shadow-2xs shrink-0 ml-1">
                   Ctrl K
                 </kbd>
               </button>
             </div>
           )}
 
-          {/* Right Action Controls */}
-          <div className="flex items-center gap-2 sm:gap-3 ml-auto">
+          {/* Right Action Controls: Grouped into Status, Tools & Profile */}
+          <div className="flex items-center gap-1.5 sm:gap-2 ml-auto shrink-0">
             
-            {/* Live Cloud Database Sync & Server Keep-Alive Status */}
-            <div className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors ${
-              syncStatus === 'synced'
-                ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
-                : syncStatus === 'syncing'
-                ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800/60'
-                : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
-            }`} title={syncStatus === 'synced' ? "Render Server Active • 13-min Auto Keep-Alive Enabled" : syncStatus === 'syncing' ? "Waking Up Render Free-Tier Server..." : "Using Local Offline Storage"}>
-              <span className={`w-2 h-2 rounded-full ${
+            {/* Live Clock & Shift Badge */}
+            <div className="hidden md:inline-flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800/70 px-2.5 py-1 rounded-full border border-slate-200/60 dark:border-slate-700/60 text-xs font-semibold text-slate-700 dark:text-slate-300 shrink-0 whitespace-nowrap">
+              <Clock className="w-3.5 h-3.5 text-blue-500 animate-pulse shrink-0" />
+              <span className="font-mono">{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase">Live</span>
+            </div>
+
+            {/* Live Cloud Database Sync Status - Strictly 1-line badge */}
+            <div 
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors shrink-0 whitespace-nowrap ${
+                syncStatus === 'synced'
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/60'
+                  : syncStatus === 'syncing'
+                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border-blue-200 dark:border-blue-800/60'
+                  : 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 border-amber-200 dark:border-amber-800/60'
+              }`} 
+              title={syncStatus === 'synced' ? "Render Server Active • Keep-Alive Auto-Sync Enabled" : syncStatus === 'syncing' ? "Waking Up Render Server..." : "Using Local Offline Storage"}
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${
                 syncStatus === 'synced' ? 'bg-emerald-500 ring-2 ring-emerald-300 dark:ring-emerald-700' :
                 syncStatus === 'syncing' ? 'bg-blue-500 animate-spin' :
                 'bg-amber-500'
               }`}></span>
-              <span>{syncStatus === 'synced' ? 'Cloud Synced (Keep-Alive)' : syncStatus === 'syncing' ? 'Waking Server...' : 'Local Cache'}</span>
+              <span className="whitespace-nowrap font-medium text-[11px]">
+                {syncStatus === 'synced' ? 'Cloud Synced' : syncStatus === 'syncing' ? 'Waking Server...' : 'Local Cache'}
+              </span>
             </div>
 
-            {/* Live Clock & Shift Badge */}
-            <div className="hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-slate-800/70 px-3 py-1.5 rounded-full border border-slate-200/60 dark:border-slate-700/60 text-xs font-semibold text-slate-700 dark:text-slate-300">
-              <Clock className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
-              <span>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-              <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Live</span>
-            </div>
+            {/* Quick Tool 1: PWA Mobile / Desktop App Install Button */}
+            {!isAppInstalled && (
+              <button
+                onClick={handleInstallClick}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-xs transition active:scale-95 shrink-0 cursor-pointer"
+                title="Install StaffPulse HRMS App on Phone or PC"
+              >
+                <Smartphone className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden xl:inline">Install App</span>
+              </button>
+            )}
+
+            {/* Quick Tool 2: ID Cards Studio Quick Access Button */}
+            {onNavigate && (isAdmin || isManager) && (
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  onNavigate('idcards');
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 dark:hover:bg-purple-900/60 border border-purple-200 dark:border-purple-800/60 text-xs font-bold transition active:scale-95 shrink-0 cursor-pointer"
+                title="Open Employee ID Card Studio & A4 Bulk Printing"
+              >
+                <Contact className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden xl:inline">ID Cards</span>
+              </button>
+            )}
+
+            {/* Quick Tool 3: Admin User Access & PINs Manager Button */}
+            {isAdmin && onOpenUserAccess && (
+              <button
+                onClick={onOpenUserAccess}
+                className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-900/60 border border-blue-200 dark:border-blue-800/60 text-xs font-bold transition active:scale-95 shrink-0"
+                title="Manage Employee Roles, Access & Login PINs"
+              >
+                <KeyRound className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden 2xl:inline">User PINs</span>
+              </button>
+            )}
 
             {/* Notifications Popover - Admin Only */}
             {isAdmin && (
-              <div className="relative" ref={notifRef}>
+              <div className="relative shrink-0" ref={notifRef}>
                 <button
                   onClick={() => setIsNotifOpen(!isNotifOpen)}
-                  className="relative p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-transparent hover:border-slate-200 dark:border-slate-700 transition-all"
+                  className="relative p-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 transition-all shrink-0"
                   title="Notifications & Alerts"
                 >
                   <Bell className="w-4 h-4" />
@@ -278,7 +322,7 @@ export default function Navbar({
             {/* Theme Toggle */}
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              className="p-2 rounded-xl text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 border border-slate-200/60 dark:border-slate-700/60 transition-colors shrink-0"
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? (
@@ -288,73 +332,37 @@ export default function Navbar({
               )}
             </button>
 
-            {/* PWA Mobile / Desktop App Install Button */}
-            {!isAppInstalled && (
-              <button
-                onClick={handleInstallClick}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition active:scale-95 cursor-pointer"
-                title="Install StaffPulse HRMS App on Phone or PC"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Install App</span>
-              </button>
-            )}
-
-            {/* ID Cards Studio Quick Access Button */}
-            {onNavigate && (isAdmin || isManager) && (
-              <button
-                onClick={() => {
-                  sounds.playSuccess();
-                  onNavigate('idcards');
-                }}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 text-purple-600 dark:text-purple-400 border border-purple-500/30 text-xs font-bold transition active:scale-95 shadow-xs cursor-pointer"
-                title="Open Employee ID Card Studio & A4 Bulk Printing"
-              >
-                <Contact className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">ID Cards</span>
-              </button>
-            )}
-
-            {/* Admin User Access & PINs Manager Button */}
-            {isAdmin && onOpenUserAccess && (
-              <button
-                onClick={onOpenUserAccess}
-                className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30 text-xs font-bold transition active:scale-95 shadow-xs"
-                title="Manage Employee Roles, Access & Login PINs"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-                <span>User PINs / Access</span>
-              </button>
-            )}
+            {/* Clean Vertical Divider */}
+            <div className="h-6 w-px bg-slate-200 dark:bg-slate-800 mx-0.5 shrink-0"></div>
 
             {/* User Profile Info & Switch/Logout */}
-            <div className="flex items-center gap-2 pl-2 border-l border-slate-200 dark:border-slate-800">
+            <div className="flex items-center gap-2 shrink-0">
               {isAdmin ? (
-                <>
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-white font-bold text-xs border-2 border-amber-400/50 shadow-xs">
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-600 flex items-center justify-center text-white font-bold text-xs border border-amber-400/50 shadow-xs shrink-0">
                     👑
                   </div>
-                  <div className="hidden xl:block text-left text-xs">
-                    <span className="font-bold text-slate-900 dark:text-white block leading-tight">
-                      {config?.companyName ? `${config.companyName} Admin` : 'Company Admin'}
+                  <div className="hidden 2xl:block text-left text-xs shrink-0">
+                    <span className="font-bold text-slate-900 dark:text-white block leading-tight truncate max-w-[130px]">
+                      {config?.companyName || 'Admin'}
                     </span>
-                    <span className="text-[10px] text-amber-500 font-extrabold uppercase">Owner / HR Head</span>
+                    <span className="text-[10px] text-amber-500 font-extrabold uppercase">HR Admin</span>
                   </div>
-                </>
+                </div>
               ) : employee ? (
-                <>
+                <div className="flex items-center gap-2 shrink-0">
                   <img
                     src={employee.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(employee.name)}&background=3b82f6&color=fff`}
                     alt={employee.name}
-                    className="w-8 h-8 rounded-full object-cover border-2 border-emerald-500/40"
+                    className="w-8 h-8 rounded-xl object-cover border-2 border-emerald-500/40 shrink-0"
                   />
-                  <div className="hidden xl:block text-left text-xs">
-                    <span className="font-bold text-slate-900 dark:text-white block leading-tight">{employee.name}</span>
+                  <div className="hidden 2xl:block text-left text-xs shrink-0">
+                    <span className="font-bold text-slate-900 dark:text-white block leading-tight truncate max-w-[130px]">{employee.name}</span>
                     <span className="text-[10px] font-semibold text-slate-400">
-                      {isManager ? '👔 Site Supervisor' : '👤 Employee'} • {employee.department || 'Operations'}
+                      {isManager ? '👔 Supervisor' : '👤 Staff'}
                     </span>
                   </div>
-                </>
+                </div>
               ) : null}
 
               {/* Logout / Switch Role button */}
@@ -364,10 +372,10 @@ export default function Navbar({
                     sounds.playSuccess();
                     onLogout();
                   }}
-                  className="ml-1 px-2.5 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:text-slate-300 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 transition-all flex items-center gap-1.5"
+                  className="px-2.5 py-1.5 text-xs font-bold rounded-xl bg-slate-100 hover:bg-rose-50 text-slate-600 hover:text-rose-600 dark:bg-slate-800 dark:hover:bg-rose-950/60 dark:text-slate-300 dark:hover:text-rose-300 border border-slate-200 dark:border-slate-700 hover:border-rose-200 dark:hover:border-rose-800 transition-all flex items-center gap-1.5 shrink-0"
                   title="Switch Role or Log Out"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
+                  <RotateCcw className="w-3.5 h-3.5 shrink-0" />
                   <span className="hidden sm:inline">Log Out</span>
                 </button>
               )}
