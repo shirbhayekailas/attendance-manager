@@ -278,9 +278,25 @@ export function saveAdvances(advances) {
 
 export function getEmployeeTotalAdvance(empId, advances, monthStr) {
   if (!advances || !Array.isArray(advances)) return 0;
-  return advances
+  return Math.max(0, advances
     .filter(a => a.empId === empId && (!monthStr || !a.month || a.month === monthStr) && a.status !== 'cancelled')
-    .reduce((sum, a) => sum + (Number(a.amount) || 0), 0);
+    .reduce((sum, a) => {
+      const amt = Number(a.amount) || 0;
+      // If the advance is already paid back / settled / cleared, it is no longer an active deduction
+      if (a.status === 'settled' || a.status === 'paid' || a.status === 'cleared') {
+        return sum;
+      }
+      // If entry is a repayment or received payment, deduct from outstanding amount
+      if (a.type === 'repayment' || a.type === 'received' || a.type === 'settlement') {
+        return sum - amt;
+      }
+      // Active advance given
+      return sum + amt;
+    }, 0));
+}
+
+export function getEmployeeOutstandingAdvance(empId, advances) {
+  return getEmployeeTotalAdvance(empId, advances, null);
 }
 
 export function saveExpenses(expenses) {

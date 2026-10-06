@@ -374,6 +374,12 @@ export default function IdCardsView({
               </span>
             </div>
             <div className="flex justify-between items-center">
+              <span className="text-slate-400 font-bold uppercase text-[9px]">DOJ (Joined)</span>
+              <span className="font-mono font-bold text-slate-700 text-[9.5px]">
+                {emp.joiningDate || emp.joinDate || 'Jan 2026'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
               <span className="text-slate-400 font-bold uppercase text-[9px]">Valid Upto</span>
               <span className="font-mono font-bold text-slate-700 text-[10px]">2028 • PERMANENT</span>
             </div>

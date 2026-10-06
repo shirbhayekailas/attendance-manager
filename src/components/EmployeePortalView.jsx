@@ -29,9 +29,9 @@ import {
   Contact
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
+import { calculateEmployeeStats, calculateWorkDuration, calculateMonthlyPayrollStats } from '../utils/attendanceCalculations';
 import { sounds } from '../utils/sound';
-import { getEmployeeTotalAdvance } from '../utils/storage';
+import { getEmployeeTotalAdvance, getEmployeeTotalExpenses } from '../utils/storage';
 import SalarySlipModal from './SalarySlipModal';
 import IdCardsView from './IdCardsView';
 
@@ -96,8 +96,28 @@ export default function EmployeePortalView({
   const isClockedIn = Boolean(todayRecord?.clockIn && todayRecord.clockIn !== '--');
   const isClockedOut = Boolean(todayRecord?.clockOut && todayRecord.clockOut !== '--');
 
-  // Stats for this employee only
-  const stats = calculateEmployeeStats(employee.id, attendance, employee.salaryMonthly || 100000, 22);
+  // Month details & Payroll calculation for current/selected pay period
+  const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+  const selectedMonthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+  const selectedMonthName = new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' });
+
+  const myMonthlyExpenses = getEmployeeTotalExpenses(employee.id, expenses, selectedMonthPrefix);
+  const myMonthlyAdvance = getEmployeeTotalAdvance(employee.id, advances, selectedMonthPrefix);
+
+  // Exact Month-Wise Payroll Calculation (30 days for Sep/Apr/Jun/Nov, 31 for others, 28/29 Feb)
+  const payrollStats = calculateMonthlyPayrollStats({
+    empId: employee.id,
+    attendanceData: attendance,
+    baseSalary: employee.salaryMonthly || 25000,
+    year: selectedYear,
+    month: selectedMonth,
+    statutoryType: employee.statutoryType || 'standard',
+    siteAllowance: myMonthlyExpenses,
+    advanceDeduction: myMonthlyAdvance,
+  });
+
+  // Dynamic attendance stats for this employee based on actual days in selected month
+  const stats = calculateEmployeeStats(employee.id, attendance, employee.salaryMonthly || 25000, daysInSelectedMonth);
 
   // Filtered employee data
   const myLeaves = leaves.filter(l => l.empId === employee.id);
@@ -272,7 +292,10 @@ export default function EmployeePortalView({
               {employee.role} • <strong className="text-white">{employee.department}</strong>
             </p>
             <p className="text-[11px] text-slate-300">
-              Shift: {employee.shift} • Reports to: {employee.reportsTo || "Team Lead"}
+              Shift: {employee.shift} • DOJ: <strong className="text-white">{employee.joiningDate || employee.joinDate || 'N/A'}</strong>
+              {employee.exitDate && (
+                <span className="text-rose-300 font-bold ml-1.5">• DOE: {employee.exitDate}</span>
+              )}
             </p>
           </div>
         </div>
@@ -463,7 +486,7 @@ export default function EmployeePortalView({
               <span className="text-[10px] font-black uppercase text-slate-400">Payable Days</span>
               <div className="mt-1 flex items-baseline gap-1">
                 <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{stats.payableDays}</span>
-                <span className="text-xs font-bold text-slate-400">/ {stats.totalWorkingDays || 22}</span>
+                <span className="text-xs font-bold text-slate-400">/ {daysInSelectedMonth}</span>
               </div>
               <span className="text-[10px] text-slate-400 block mt-1">Salary base earned</span>
             </div>
@@ -995,7 +1018,7 @@ export default function EmployeePortalView({
                   My Official Salary Statement
                 </h3>
                 <p className="text-xs text-slate-400">
-                  {config?.companyName || 'SK ENTERPRISES'} • September 2026
+                  {config?.companyName || 'SK ENTERPRISES'} • {selectedMonthName} {selectedYear}
                 </p>
               </div>
 
@@ -1011,47 +1034,52 @@ export default function EmployeePortalView({
               </button>
             </div>
 
-            {/* Quick Metrics Breakdown */}
+            {/* Quick Metrics Breakdown - Exact Calendar Days Base (30/31 days) */}
             <div className="p-5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-3 text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-medium">Basic Monthly Salary:</span>
                 <span className="font-mono font-bold text-slate-900 dark:text-white text-sm">
-                  ₹{employee.salaryMonthly?.toLocaleString('en-IN') || '1,00,000'}
+                  ₹{payrollStats.baseSalary.toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-slate-500 font-medium">Attended / Payable Sessions:</span>
                 <span className="font-bold text-emerald-600">
-                  {stats.payableDays} / 22 Working Days Base
+                  {payrollStats.payableDays} / {payrollStats.daysInMonth} Days Base (₹{payrollStats.perDaySalary}/day)
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-medium">Overtime Earnings ({stats.totalOvertimeHours}h @ 1.5x):</span>
+                <span className="text-slate-500 font-medium">Overtime Earnings ({payrollStats.totalOvertimeHours}h @ 1.5x):</span>
                 <span className="font-mono font-bold text-blue-600">
-                  +₹{stats.overtimePay?.toLocaleString('en-IN')}
+                  +₹{payrollStats.overtimePay.toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-slate-500 font-medium">Loss of Pay Deduction ({stats.unpaidAbsent}d LWP):</span>
+                <span className="text-slate-500 font-medium">Loss of Pay Deduction ({payrollStats.unpaidAbsent}d LOP):</span>
                 <span className="font-mono font-bold text-rose-500">
-                  -₹{stats.lossOfPayDeduction?.toLocaleString('en-IN')}
+                  -₹{payrollStats.lossOfPayDeduction.toLocaleString('en-IN')}
                 </span>
               </div>
-              {(() => {
-                const empAdvance = getEmployeeTotalAdvance(employee?.id, advances, '2026-09');
-                return empAdvance > 0 ? (
-                  <div className="flex justify-between items-center bg-amber-50/70 dark:bg-amber-950/30 p-2 rounded-xl border border-amber-200 dark:border-amber-900/50">
-                    <span className="text-amber-800 dark:text-amber-300 font-bold">Salary Advance Received:</span>
-                    <span className="font-mono font-black text-amber-600 dark:text-amber-400">
-                      -₹{empAdvance.toLocaleString('en-IN')}
-                    </span>
-                  </div>
-                ) : null;
-              })()}
+              {payrollStats.siteAllowance > 0 && (
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500 font-medium">Site Expense / Travel Reimbursement:</span>
+                  <span className="font-mono font-bold text-emerald-600">
+                    +₹{payrollStats.siteAllowance.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
+              {payrollStats.advanceDeduction > 0 && (
+                <div className="flex justify-between items-center bg-amber-50/70 dark:bg-amber-950/30 p-2 rounded-xl border border-amber-200 dark:border-amber-900/50">
+                  <span className="text-amber-800 dark:text-amber-300 font-bold">Salary Advance Deduction:</span>
+                  <span className="font-mono font-black text-amber-600 dark:text-amber-400">
+                    -₹{payrollStats.advanceDeduction.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              )}
               <div className="pt-3 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center text-base">
                 <span className="font-black text-slate-900 dark:text-white">Estimated Net Take-Home:</span>
                 <span className="font-mono font-black text-emerald-600 text-lg">
-                  ₹{Math.max(0, (stats.netEstimatedSalary || 0) - getEmployeeTotalAdvance(employee?.id, advances, '2026-09')).toLocaleString('en-IN')}
+                  ₹{payrollStats.netPayable.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
@@ -1059,37 +1087,35 @@ export default function EmployeePortalView({
             {/* Detailed Salary Structure Preview */}
             <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden text-xs">
               <div className="bg-slate-100 dark:bg-slate-800/80 px-4 py-2 font-bold text-slate-700 dark:text-slate-300 flex justify-between uppercase text-[10px] tracking-wide">
-                <span>Monthly Salary Structure Preview</span>
+                <span>Monthly Salary Structure Preview ({payrollStats.monthYearStr})</span>
                 <span>Breakdown (INR)</span>
               </div>
               <div className="divide-y divide-slate-100 dark:divide-slate-800/60 p-1">
                 <div className="p-2.5 flex justify-between">
-                  <span className="text-slate-500">Basic Salary</span>
+                  <span className="text-slate-500">Earned Basic Wage ({payrollStats.payableDays} days)</span>
                   <span className="font-mono font-semibold text-slate-800 dark:text-slate-200">
-                    ₹{(employee.salaryMonthly || 100000).toLocaleString('en-IN')}
+                    ₹{payrollStats.earnedBasic.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="p-2.5 flex justify-between">
+                  <span className="text-slate-500">Statutory Scheme</span>
+                  <span className={`font-semibold ${payrollStats.isPfEsic ? 'text-blue-600 dark:text-blue-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                    {payrollStats.isPfEsic ? 'PF & ESIC Applicable' : 'Non-PF & Non-ESIC (Exempt)'}
                   </span>
                 </div>
                 <div className="p-2.5 flex justify-between">
                   <span className="text-slate-500">
-                    Statutory Scheme
-                  </span>
-                  <span className={`font-semibold ${employee.statutoryType === 'non_pf_esic' ? 'text-amber-600 dark:text-amber-400' : 'text-blue-600 dark:text-blue-400'}`}>
-                    {employee.statutoryType === 'non_pf_esic' ? 'Non-PF & Non-ESIC (Exempt)' : 'PF & ESIC Applicable'}
-                  </span>
-                </div>
-                <div className="p-2.5 flex justify-between">
-                  <span className="text-slate-500">
-                    Statutory Deductions ({employee.statutoryType === 'non_pf_esic' ? 'PT, TDS' : 'EPF (12%), PT, TDS'})
+                    Statutory Deductions ({payrollStats.isPfEsic ? 'EPF (12%), ESIC (0.75%), PT, TDS' : 'PT (₹200)'})
                   </span>
                   <span className="font-mono font-semibold text-rose-500">
-                    -₹{((employee.statutoryType === 'non_pf_esic' ? 0 : Math.min(Math.round((employee.salaryMonthly || 100000) * 0.12), 1800)) + 200 + (stats.lossOfPayDeduction || 0)).toLocaleString('en-IN')}
+                    -₹{(payrollStats.epf + payrollStats.esic + payrollStats.pt + payrollStats.tds).toLocaleString('en-IN')}
                   </span>
                 </div>
-                {getEmployeeTotalAdvance(employee?.id, advances, '2026-09') > 0 && (
+                {payrollStats.advanceDeduction > 0 && (
                   <div className="p-2.5 flex justify-between bg-amber-50/50 dark:bg-amber-950/20">
                     <span className="text-amber-800 dark:text-amber-300 font-medium">Salary Advance Deduction</span>
                     <span className="font-mono font-bold text-amber-600 dark:text-amber-400">
-                      -₹{getEmployeeTotalAdvance(employee?.id, advances, '2026-09').toLocaleString('en-IN')}
+                      -₹{payrollStats.advanceDeduction.toLocaleString('en-IN')}
                     </span>
                   </div>
                 )}
@@ -1535,8 +1561,9 @@ export default function EmployeePortalView({
           employee={employee}
           attendance={attendance}
           advances={advances}
+          expenses={expenses}
           config={config}
-          monthYear="September 2026"
+          monthYear={`${selectedMonthName} ${selectedYear}`}
           onClose={() => setIsSalarySlipModalOpen(false)}
         />
       )}

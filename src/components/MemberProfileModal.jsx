@@ -17,7 +17,8 @@ import {
   ChevronRight,
   Printer,
   IndianRupee,
-  Contact
+  Contact,
+  LogOut
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
 import { getEmployeeTotalAdvance } from '../utils/storage';
@@ -48,7 +49,11 @@ export default function MemberProfileModal({
 
   if (!employee) return null;
 
-  const stats = calculateEmployeeStats(employee.id, attendance);
+  // Generate days for selected month
+  const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+  const monthName = new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' });
+
+  const stats = calculateEmployeeStats(employee.id, attendance, employee.salaryMonthly || 100000, daysInMonth);
 
   // Month navigation
   const handlePrevMonth = () => {
@@ -70,10 +75,6 @@ export default function MemberProfileModal({
       setSelectedMonth(selectedMonth + 1);
     }
   };
-
-  // Generate days for selected month
-  const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-  const monthName = new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' });
 
   const monthlyDayList = [];
   let mOffice = 0;
@@ -216,6 +217,21 @@ export default function MemberProfileModal({
                   {employee.role || 'Staff'} • <span className="text-white font-bold">{employee.department || 'Operations'}</span>
                 </p>
                 <div className="flex flex-wrap items-center gap-4 text-xs text-slate-300 pt-0.5">
+                  <span className="flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                    DOJ: <strong className="text-white">{employee.joiningDate || employee.joinDate || 'N/A'}</strong>
+                  </span>
+                  {employee.exitDate ? (
+                    <span className="flex items-center gap-1.5 text-rose-300">
+                      <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                      DOE: <strong className="text-rose-200">{employee.exitDate}</strong>
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 text-emerald-300">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                      Currently Active
+                    </span>
+                  )}
                   {employee.email && (
                     <span className="flex items-center gap-1.5">
                       <Mail className="w-3.5 h-3.5 text-blue-400" />
@@ -304,7 +320,7 @@ export default function MemberProfileModal({
             <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
               <span className="text-[10px] font-bold uppercase text-slate-400">Total Payable</span>
               <div className="mt-1 text-2xl font-black text-emerald-600 dark:text-emerald-400">
-                {stats.payableDays} <span className="text-xs font-normal text-slate-400">/ 22d</span>
+                {stats.payableDays} <span className="text-xs font-normal text-slate-400">/ {daysInMonth}d</span>
               </div>
             </div>
 

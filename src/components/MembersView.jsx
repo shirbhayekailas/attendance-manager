@@ -27,7 +27,9 @@ import {
   Image as ImageIcon,
   IndianRupee,
   Wallet,
-  Contact
+  Contact,
+  Calendar,
+  LogOut
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateStatutoryComponents } from '../utils/attendanceCalculations';
 import { getEmployeeTotalAdvance } from '../utils/storage';
@@ -136,6 +138,8 @@ export default function MembersView({
       loginId: nextId,
       password: '1234',
       statutoryType: 'pf_esic',
+      joiningDate: new Date().toISOString().split('T')[0],
+      exitDate: '',
       uanNo: '',
       esicNo: '',
     });
@@ -158,6 +162,8 @@ export default function MembersView({
       salaryBase: emp.salaryBase || `₹${empSalary.toLocaleString('en-IN')}`,
       salaryMonthly: empSalary,
       shift: emp.shift || '09:30 AM - 06:30 PM',
+      joiningDate: emp.joiningDate || emp.joinDate || new Date().toISOString().split('T')[0],
+      exitDate: emp.exitDate || '',
       avatar: emp.avatar || '',
       accessLevel: emp.accessLevel || 'employee',
       loginId: emp.loginId || emp.id,
@@ -225,11 +231,17 @@ export default function MembersView({
     const numSalary = parseInt(String(formData.salaryBase).replace(/[^0-9]/g, ''), 10) || 15000;
     const finalAvatar = formData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(formData.name || 'Staff')}&background=0284c7&color=fff&bold=true`;
 
+    const effectiveJoiningDate = formData.joiningDate || formData.joinDate || new Date().toISOString().split('T')[0];
+    const effectiveExitDate = formData.exitDate || '';
+
     const payload = {
       ...formData,
       department: finalDept,
       salaryMonthly: numSalary,
       statutoryType: formData.statutoryType || 'pf_esic',
+      joiningDate: effectiveJoiningDate,
+      joinDate: effectiveJoiningDate,
+      exitDate: effectiveExitDate,
       uanNo: formData.uanNo || '',
       esicNo: formData.esicNo || '',
       bankName: formData.bankName || 'HDFC Bank Ltd',
@@ -248,7 +260,9 @@ export default function MembersView({
         loginId: payload.loginId || payload.id,
         password: payload.password || '1234',
         pin: payload.password || '1234',
-        joinDate: new Date().toISOString().split('T')[0],
+        joinDate: effectiveJoiningDate,
+        joiningDate: effectiveJoiningDate,
+        exitDate: effectiveExitDate,
         leaveBalance: { cl: 8, sl: 5, pl: 12 },
       };
       setEmployees([...employees, newEmp]);
@@ -556,6 +570,23 @@ export default function MembersView({
                       <span>{emp.bankName || 'Bank'}: •••• {emp.bankAccountNo.slice(-4)}</span>
                     </div>
                   )}
+
+                  {/* Joining Date & Exit Date */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                      <span>DOJ: <strong>{emp.joiningDate || emp.joinDate || 'N/A'}</strong></span>
+                    </span>
+                    {emp.exitDate ? (
+                      <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">
+                        DOE: {emp.exitDate}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                        ● Active
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -872,6 +903,39 @@ export default function MembersView({
                           placeholder="+91 98765 43210"
                           className="w-full p-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                         />
+                      </div>
+                    </div>
+
+                    {/* Joining Date & Exit Date */}
+                    <div className="grid grid-cols-2 gap-3 pt-1 border-t border-slate-200 dark:border-slate-700/60">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                          <span>Date of Joining (DOJ) *</span>
+                        </label>
+                        <input
+                          type="date"
+                          required
+                          value={formData.joiningDate || ''}
+                          onChange={(e) => setFormData({ ...formData, joiningDate: e.target.value })}
+                          className="w-full p-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">Official Joining Date</span>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
+                          <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                          <span>Date of Exit (DOE)</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.exitDate || ''}
+                          onChange={(e) => setFormData({ ...formData, exitDate: e.target.value })}
+                          placeholder="Optional"
+                          className="w-full p-2.5 text-xs rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        />
+                        <span className="text-[10px] text-slate-400 mt-0.5 block">Blank if currently active</span>
                       </div>
                     </div>
 
