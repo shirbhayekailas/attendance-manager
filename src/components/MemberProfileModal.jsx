@@ -85,40 +85,29 @@ export default function MemberProfileModal({
   let mLeave = 0;
   let mAbsent = 0;
   let mWeekOff = 0;
-  const weekMap = {};
 
   for (let d = 1; d <= daysInMonth; d++) {
     const dObj = new Date(selectedYear, selectedMonth, d);
     const dayOfWeek = dObj.getDay();
-    const mondayOffset = (dayOfWeek + 6) % 7;
-    const mondayDate = new Date(selectedYear, selectedMonth, d - mondayOffset);
-    const weekKey = mondayDate.toISOString().split('T')[0];
-    if (!weekMap[weekKey]) weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
-
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const rec = attendance[dateStr]?.[employee.id];
 
-    let status = rec?.status || (isWeekend ? 'weekend' : 'none');
+    let status = rec?.status || 'none';
     if (status === 'present') {
       mOffice++;
-      if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
     } else if (status === 'wfh') {
       mWfh++;
-      if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
     } else if (status === 'late') {
       mOffice++; mLate++;
-      if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
     } else if (status === 'leave') {
       mLeave++;
     } else if (status === 'absent') {
       mAbsent++;
-    } else if (status === 'week_off' || status === 'wo' || status === 'none') {
+    } else if (status === 'week_off' || status === 'wo') {
       mWeekOff++;
-      if (dayOfWeek === 0) weekMap[weekKey].hasSundayOff = true;
     } else if (status === 'week_off_present' || status === 'wo_present') {
       mOffice++;
-      if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
     }
 
     const otHours = (rec?.overtimeHours !== undefined && rec?.overtimeHours !== null && rec?.overtimeHours !== '')
@@ -148,11 +137,10 @@ export default function MemberProfileModal({
     d.setDate(today.getDate() - i);
     const dateStr = d.toISOString().split('T')[0];
     const rec = attendance[dateStr]?.[employee.id];
-    const isWeekend = d.getDay() === 0 || d.getDay() === 6;
 
     heatmapDays.push({
       date: dateStr,
-      status: rec?.status || (isWeekend ? 'weekend' : 'no_data'),
+      status: rec?.status || 'no_data',
       clockIn: rec?.clockIn || '',
       clockOut: rec?.clockOut || '',
       note: rec?.note || '',

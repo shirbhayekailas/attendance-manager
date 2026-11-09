@@ -645,43 +645,32 @@ export default function EmployeePortalView({
         let mLeave = 0;
         let mAbsent = 0;
         let mWeekOff = 0;
-        const weekMap = {};
 
         targetDateObjs.forEach((dObj) => {
           const d = dObj.getDate();
           const dayOfWeek = dObj.getDay();
-          const mondayOffset = (dayOfWeek + 6) % 7;
-          const mondayDate = new Date(dObj.getFullYear(), dObj.getMonth(), d - mondayOffset);
-          const weekKey = mondayDate.toISOString().split('T')[0];
-          if (!weekMap[weekKey]) weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
-
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
           const dateStr = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const rec = attendance[dateStr]?.[employee.id];
 
-          let status = rec?.status || (isWeekend ? 'weekend' : 'none');
+          let status = rec?.status || 'none';
           if (status === 'present') {
             mOffice++;
-            if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
           } else if (status === 'wfh') {
             mWfh++;
-            if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
           } else if (status === 'late') {
             mOffice++;
             mLate++;
-            if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
           } else if (status === 'half_day') {
             mHalfDay++;
           } else if (status === 'leave') {
             mLeave++;
           } else if (status === 'absent') {
             mAbsent++;
-          } else if (status === 'week_off' || status === 'wo' || status === 'none') {
+          } else if (status === 'week_off' || status === 'wo') {
             mWeekOff++;
-            if (dayOfWeek === 0) weekMap[weekKey].hasSundayOff = true;
           } else if (status === 'week_off_present' || status === 'wo_present') {
             mOffice++;
-            if (dayOfWeek !== 0) weekMap[weekKey].workedDays++;
           }
 
           monthlyDayList.push({
@@ -699,13 +688,7 @@ export default function EmployeePortalView({
           });
         });
 
-        let mEarnedWeekOff = 0;
-        Object.values(weekMap).forEach((w) => {
-          if (w.workedDays >= 6 && w.hasSundayOff) {
-            mEarnedWeekOff++;
-          }
-        });
-
+        const mEarnedWeekOff = mWeekOff;
         const mPayable = mOffice + mWfh + mLeave + mEarnedWeekOff + (0.5 * mHalfDay);
         const activeDay = monthlyDayList.find(d => d.dateStr === selectedCalendarDateStr) 
           || monthlyDayList.find(d => d.dateStr === new Date().toISOString().split('T')[0]) 
@@ -1079,20 +1062,20 @@ export default function EmployeePortalView({
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
                           activeDay.status === 'present' ? 'bg-emerald-500 text-white shadow-xs' :
                           activeDay.status === 'wfh' ? 'bg-indigo-500 text-white shadow-xs' :
+                          (activeDay.status === 'week_off' || activeDay.status === 'wo') ? 'bg-sky-500 text-white shadow-xs' :
                           activeDay.status === 'late' ? 'bg-amber-400 text-slate-900' :
                           activeDay.status === 'half_day' ? 'bg-yellow-400 text-slate-900' :
                           activeDay.status === 'leave' ? 'bg-purple-500 text-white' :
                           activeDay.status === 'absent' ? 'bg-rose-500 text-white' :
-                          activeDay.isWeekend ? 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300' :
                           'bg-slate-200 dark:bg-slate-700 text-slate-500'
                         }`}>
                           {activeDay.status === 'present' ? 'Office' :
                            activeDay.status === 'wfh' ? 'WFH' :
+                           (activeDay.status === 'week_off' || activeDay.status === 'wo') ? 'Week Off' :
                            activeDay.status === 'late' ? 'Late Punch' :
                            activeDay.status === 'half_day' ? 'Half Day' :
                            activeDay.status === 'leave' ? 'Leave' :
-                           activeDay.status === 'absent' ? 'Absent' :
-                           activeDay.isWeekend ? 'Week Off' : 'No Log'}
+                           activeDay.status === 'absent' ? 'Absent' : 'No Log'}
                         </span>
                       </div>
 
@@ -1160,11 +1143,11 @@ export default function EmployeePortalView({
                           }${
                             d.status === 'present' ? 'bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/60' :
                             d.status === 'wfh' ? 'bg-indigo-50/60 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-800/60' :
+                            (d.status === 'week_off' || d.status === 'wo') ? 'bg-sky-50/60 dark:bg-sky-950/20 border-sky-200 dark:border-sky-800/60' :
                             d.status === 'late' ? 'bg-amber-50/60 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800/60' :
                             d.status === 'half_day' ? 'bg-yellow-50/60 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800/60' :
                             d.status === 'leave' ? 'bg-purple-50/60 dark:bg-purple-950/20 border-purple-200 dark:border-purple-800/60' :
                             d.status === 'absent' ? 'bg-rose-50/60 dark:bg-rose-950/20 border-rose-200 dark:border-rose-800/60' :
-                            d.isWeekend ? 'bg-slate-50/70 dark:bg-slate-800/40 border-slate-200/50 dark:border-slate-800 text-slate-400' :
                             'bg-slate-50/40 dark:bg-slate-800/20 border-slate-100 dark:border-slate-800/60'
                           }`}
                         >
@@ -1174,15 +1157,13 @@ export default function EmployeePortalView({
                               <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md uppercase truncate max-w-[55px] ${
                                 d.status === 'present' ? 'bg-emerald-500 text-white' :
                                 d.status === 'wfh' ? 'bg-indigo-500 text-white' :
+                                (d.status === 'week_off' || d.status === 'wo') ? 'bg-sky-500 text-white' :
                                 d.status === 'late' ? 'bg-amber-400 text-slate-900' :
                                 d.status === 'leave' ? 'bg-purple-500 text-white' :
                                 'bg-rose-500 text-white'
                               }`}>
-                                {d.status === 'present' ? 'Office' : d.status.toUpperCase()}
+                                {d.status === 'present' ? 'Office' : (d.status === 'week_off' || d.status === 'wo') ? 'WO' : d.status.toUpperCase()}
                               </span>
-                            )}
-                            {d.isWeekend && (
-                              <span className="text-[9px] font-bold text-slate-400 uppercase">Off</span>
                             )}
                           </div>
 
@@ -1216,11 +1197,7 @@ export default function EmployeePortalView({
                   {monthlyDayList.map((d) => (
                     <div 
                       key={`feed-${d.dateStr}`}
-                      className={`p-3 rounded-2xl border transition-all ${
-                        d.isWeekend 
-                          ? 'bg-slate-50/50 dark:bg-slate-800/20 border-slate-200/60 dark:border-slate-800' 
-                          : 'bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 shadow-xs'
-                      }`}
+                      className="p-3 rounded-2xl border transition-all bg-white dark:bg-slate-900 border-slate-200/80 dark:border-slate-800 shadow-xs"
                     >
                       <div className="flex items-center justify-between mb-1.5">
                         <div className="flex items-center gap-2">
@@ -1234,14 +1211,14 @@ export default function EmployeePortalView({
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
                           d.status === 'present' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
                           d.status === 'wfh' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' :
+                          (d.status === 'week_off' || d.status === 'wo') ? 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300' :
                           d.status === 'late' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
                           d.status === 'half_day' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300' :
                           d.status === 'leave' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' :
                           d.status === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
-                          d.isWeekend ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
                           'bg-slate-100 text-slate-400 dark:bg-slate-800'
                         }`}>
-                          {d.status === 'present' ? 'Office' : d.status === 'none' ? 'No Log' : d.status}
+                          {d.status === 'present' ? 'Office' : (d.status === 'week_off' || d.status === 'wo') ? 'Week Off' : d.status === 'none' ? 'No Log' : d.status}
                         </span>
                       </div>
 
@@ -1279,9 +1256,7 @@ export default function EmployeePortalView({
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {monthlyDayList.map((d) => (
-                          <tr key={d.dateStr} className={`hover:bg-slate-50/50 dark:hover:bg-slate-800/40 ${
-                            d.isWeekend ? 'bg-slate-50/30 dark:bg-slate-800/20' : ''
-                          }`}>
+                          <tr key={d.dateStr} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                             <td className="p-3.5 font-bold text-slate-900 dark:text-white">
                               {d.dateStr} <span className="text-slate-400 font-normal">({d.weekday})</span>
                             </td>
@@ -1289,14 +1264,14 @@ export default function EmployeePortalView({
                               <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
                                 d.status === 'present' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' :
                                 d.status === 'wfh' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300' :
+                                (d.status === 'week_off' || d.status === 'wo') ? 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300' :
                                 d.status === 'late' ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' :
                                 d.status === 'half_day' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300' :
                                 d.status === 'leave' ? 'bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300' :
                                 d.status === 'absent' ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300' :
-                                d.isWeekend ? 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' :
                                 'text-slate-400'
                               }`}>
-                                {d.status === 'present' ? 'Office' : d.status === 'none' ? 'No Log' : d.status}
+                                {d.status === 'present' ? 'Office' : (d.status === 'week_off' || d.status === 'wo') ? 'Week Off' : d.status === 'none' ? 'No Log' : d.status}
                               </span>
                             </td>
                             <td className="p-3.5 font-mono text-slate-600 dark:text-slate-300">{d.clockIn}</td>

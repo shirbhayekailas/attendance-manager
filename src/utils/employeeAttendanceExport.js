@@ -12,28 +12,19 @@ export function buildEmployeeAttendanceReportData(employee, dateStrings = [], at
   let halfDay = 0;
   let paidLeave = 0;
   let absent = 0;
+  let weekOff = 0;
   let weekOffDuty = 0;
   let holiday = 0;
   let totalOt = 0;
-  const weekMap = {};
 
   dateStrings.forEach((dateStr) => {
     const dObj = new Date(dateStr + 'T00:00:00');
     const dayOfWeek = dObj.getDay();
-    const isSunday = dayOfWeek === 0;
     const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     const weekday = dObj.toLocaleDateString('en-IN', { weekday: 'short' });
 
-    const mondayOffset = (dayOfWeek + 6) % 7;
-    const mondayDate = new Date(dObj);
-    mondayDate.setDate(dObj.getDate() - mondayOffset);
-    const weekKey = mondayDate.toISOString().split('T')[0];
-    if (!weekMap[weekKey]) {
-      weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
-    }
-
     const rec = attendance?.[dateStr]?.[employee?.id];
-    const rawStatus = rec?.status || (isSunday ? 'week_off' : 'none');
+    const rawStatus = rec?.status || 'none';
 
     let statusLabel = 'Unmarked';
     let statusCode = 'none';
@@ -42,12 +33,10 @@ export function buildEmployeeAttendanceReportData(employee, dateStrings = [], at
       const isWODuty =
         rec.status === 'week_off_present' ||
         rec.status === 'wo_present' ||
-        rec.isWeekOffDuty === true ||
-        (rec.status === 'present' && isSunday);
+        rec.isWeekOffDuty === true;
 
       if (rec.status === 'present') {
         inOffice++;
-        if (!isSunday) weekMap[weekKey].workedDays++;
         if (isWODuty) {
           weekOffDuty++;
           statusLabel = 'WO Duty (Present)';
@@ -59,24 +48,20 @@ export function buildEmployeeAttendanceReportData(employee, dateStrings = [], at
       } else if (rec.status === 'week_off_present' || rec.status === 'wo_present') {
         inOffice++;
         weekOffDuty++;
-        if (!isSunday) weekMap[weekKey].workedDays++;
         statusLabel = 'WO Duty (Present)';
         statusCode = 'wo_duty';
       } else if (rec.status === 'wfh') {
         wfh++;
-        if (!isSunday) weekMap[weekKey].workedDays++;
         statusLabel = 'Work From Home';
         statusCode = 'wfh';
       } else if (rec.status === 'late') {
         inOffice++;
         late++;
-        if (!isSunday) weekMap[weekKey].workedDays++;
         if (isWODuty) weekOffDuty++;
         statusLabel = 'Present (Late)';
         statusCode = 'late';
       } else if (rec.status === 'half_day') {
         halfDay++;
-        if (!isSunday) weekMap[weekKey].workedDays += 0.5;
         statusLabel = 'Half Day';
         statusCode = 'half_day';
       } else if (rec.status === 'leave') {
@@ -88,7 +73,7 @@ export function buildEmployeeAttendanceReportData(employee, dateStrings = [], at
         statusLabel = 'Absent (LWP)';
         statusCode = 'absent';
       } else if (rec.status === 'week_off' || rec.status === 'wo') {
-        if (isSunday) weekMap[weekKey].hasSundayOff = true;
+        weekOff++;
         statusLabel = 'Week Off';
         statusCode = 'week_off';
       } else if (rec.status === 'holiday' || rec.status === 'ph') {
@@ -96,10 +81,6 @@ export function buildEmployeeAttendanceReportData(employee, dateStrings = [], at
         statusLabel = 'Paid Holiday';
         statusCode = 'holiday';
       }
-    } else if (isSunday) {
-      weekMap[weekKey].hasSundayOff = true;
-      statusLabel = 'Sunday';
-      statusCode = 'week_off';
     }
 
     const otHours = Number(rec?.overtimeHours) || 0;
@@ -127,12 +108,7 @@ export function buildEmployeeAttendanceReportData(employee, dateStrings = [], at
     });
   });
 
-  let earnedWeekOff = 0;
-  Object.values(weekMap).forEach((w) => {
-    if (w.workedDays >= 6 && w.hasSundayOff) {
-      earnedWeekOff++;
-    }
-  });
+  const earnedWeekOff = weekOff;
 
   const regularOffice = Math.max(0, inOffice - weekOffDuty);
   const payableDays =

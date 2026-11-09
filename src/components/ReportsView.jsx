@@ -157,19 +157,8 @@ export default function ReportsView({
     let rangeLate = 0;
     let rangeWeekOffDuty = 0;
     let rangeOvertime = 0;
-    const weekMap = {};
-
     filteredDates.forEach((d) => {
       const rec = attendance[d]?.[emp.id];
-      const dateObj = new Date(d + 'T00:00:00');
-      const dayOfWeek = dateObj.getDay(); // 0 is Sunday
-      const isSunday = dayOfWeek === 0;
-
-      // Group calendar weeks starting on Monday for week-off rule
-      const mondayOffset = (dayOfWeek + 6) % 7;
-      const mondayDate = new Date(dateObj.getTime() - mondayOffset * 86400000);
-      const weekKey = mondayDate.toISOString().split('T')[0];
-      if (!weekMap[weekKey]) weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
 
       if (rec && rec.status) {
         rangeTotal++;
@@ -181,52 +170,37 @@ export default function ReportsView({
             : 0);
         rangeOvertime += ot;
 
-        const isWODuty = rec.isWeekOffDuty || status === 'week_off_present' || status === 'wo_present' || ((status === 'present' || status === 'late' || status === 'wfh') && isSunday) || /week.?off|sunday|wo/i.test(rec.note || '');
+        const isWODuty = rec.isWeekOffDuty === true || status === 'week_off_present' || status === 'wo_present';
 
         if (status === 'present') {
           rangeOffice++;
           if (isWODuty) rangeWeekOffDuty++;
-          if (!isSunday) weekMap[weekKey].workedDays++;
         } else if (status === 'wfh') {
           rangeWFH++;
           if (isWODuty) rangeWeekOffDuty++;
-          if (!isSunday) weekMap[weekKey].workedDays++;
         } else if (status === 'late') {
           rangeOffice++;
           rangeLate++;
           if (isWODuty) rangeWeekOffDuty++;
-          if (!isSunday) weekMap[weekKey].workedDays++;
         } else if (status === 'half_day') {
           rangeHalfDay++;
         } else if (status === 'leave') {
           rangeLeave++;
         } else if (status === 'absent') {
           rangeAbsent++;
-        } else if (status === 'week_off' || status === 'wo' || status === 'none') {
+        } else if (status === 'week_off' || status === 'wo') {
           rangeWeekOff++;
-          if (isSunday) weekMap[weekKey].hasSundayOff = true;
         } else if (status === 'holiday' || status === 'ph') {
           rangeHoliday++;
         } else if (status === 'week_off_present' || status === 'wo_present') {
           rangeOffice++;
           rangeWeekOffDuty++;
-          if (!isSunday) weekMap[weekKey].workedDays++;
-        }
-      } else {
-        if (isSunday) {
-          rangeWeekOff++;
-          weekMap[weekKey].hasSundayOff = true;
         }
       }
     });
 
-    // 6-Day Work Qualification Rule for Paid Weekly Offs (Sunday)
-    let earnedPaidWeekOffs = 0;
-    Object.values(weekMap).forEach((w) => {
-      if (w.workedDays >= 6 && w.hasSundayOff) {
-        earnedPaidWeekOffs++;
-      }
-    });
+    // Only manually marked Week Offs count (Sunday is never automatically assumed as Week Off)
+    const earnedPaidWeekOffs = rangeWeekOff;
 
     // Regular office days excluding rest day duty
     const regularOffice = Math.max(0, rangeOffice - rangeWeekOffDuty);

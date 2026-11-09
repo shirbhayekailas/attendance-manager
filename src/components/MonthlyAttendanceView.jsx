@@ -299,13 +299,12 @@ export default function MonthlyAttendanceView({
     onSaveToast(`Marked ${sundaysCount} Sundays as Week Off! ${preservedCount > 0 ? `(Preserved ${preservedCount} existing punches/present records)` : ''}`);
   };
 
-  // Helper to get status representation
-  const getDayStatus = (empId, dateStr, isWeekend) => {
+  // Helper to get status representation (Never auto-assume weekend/Sunday as Week Off)
+  const getDayStatus = (empId, dateStr) => {
     const rec = attendance[dateStr]?.[empId];
     if (rec && rec.status) {
       return rec.status;
     }
-    if (isWeekend) return 'weekend';
     return 'none';
   };
 
@@ -322,12 +321,11 @@ export default function MonthlyAttendanceView({
     let weekOffDuty = 0;
     let totalOt = 0;
 
-    monthDays.forEach(({ dateStr, isWeekend, dayOfWeek }) => {
+    monthDays.forEach(({ dateStr }) => {
       const rec = attendance[dateStr]?.[empId];
-      const isSunday = dayOfWeek === 0;
 
       if (rec?.status) {
-        const isWODuty = rec.status === 'week_off_present' || rec.status === 'wo_present' || rec.isWeekOffDuty || (rec.status === 'present' && isSunday);
+        const isWODuty = rec.status === 'week_off_present' || rec.status === 'wo_present' || rec.isWeekOffDuty === true;
         
         if (rec.status === 'present') {
           office++;
