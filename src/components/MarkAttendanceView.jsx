@@ -438,12 +438,12 @@ _Automated summary report from SK ENTERPRISES StaffPulse._`;
             Today
           </button>
 
-          {/* Daily vs Monthly Switcher */}
+          {/* Daily vs Monthly vs Report Switcher */}
           {onNavigate && (
-            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold ml-2">
+            <div className="flex flex-wrap p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold ml-1 gap-1">
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-2xs"
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-2xs cursor-pointer"
               >
                 Daily
               </button>
@@ -453,11 +453,23 @@ _Automated summary report from SK ENTERPRISES StaffPulse._`;
                   sounds.playSuccess();
                   onNavigate('monthly');
                 }}
-                className="px-3 py-1.5 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all flex items-center gap-1.5"
-                title="Switch to 30-Day Monthly Attendance Grid"
+                className="px-3 py-1.5 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700 transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Switch to 30-Day Monthly Attendance Grid & Custom Period"
               >
-                <CalendarDays className="w-3.5 h-3.5" />
+                <CalendarDays className="w-3.5 h-3.5 text-purple-500" />
                 <span>Monthly Muster</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playSuccess();
+                  onNavigate('reports');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Open Month-Wise & Custom Period Attendance Report"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>📊 Attendance Report</span>
               </button>
             </div>
           )}

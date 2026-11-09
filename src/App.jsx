@@ -31,6 +31,7 @@ import {
   CheckSquare, 
   Users, 
   Contact, 
+  FileSpreadsheet,
   Menu 
 } from 'lucide-react';
 
@@ -850,7 +851,7 @@ export default function App() {
       </div>
 
       {/* Mobile Bottom Quick-Access Action Bar (Admin & Manager) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-2 py-1.5 flex items-center justify-around shadow-lg">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-1 py-1.5 flex items-center justify-around shadow-lg">
         <button
           onClick={() => handleNavigate('dashboard')}
           className={`flex flex-col items-center gap-0.5 p-1 rounded-xl transition cursor-pointer ${
@@ -876,6 +877,19 @@ export default function App() {
         </button>
 
         <button
+          onClick={() => handleNavigate('reports')}
+          className={`flex flex-col items-center gap-0.5 p-1 rounded-xl relative transition cursor-pointer ${
+            effectiveTab === 'reports' 
+              ? 'text-blue-600 dark:text-blue-400 font-black' 
+              : 'text-slate-500 dark:text-slate-400'
+          }`}
+        >
+          <FileSpreadsheet className="w-5 h-5" />
+          <span className="text-[10px] font-bold">📊 Reports</span>
+          <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+        </button>
+
+        <button
           onClick={() => handleNavigate('employees')}
           className={`flex flex-col items-center gap-0.5 p-1 rounded-xl transition cursor-pointer ${
             effectiveTab === 'employees' 
@@ -897,7 +911,6 @@ export default function App() {
         >
           <Contact className="w-5 h-5" />
           <span className="text-[10px] font-bold">🪪 ID Cards</span>
-          <span className="absolute top-0.5 right-2 w-2 h-2 rounded-full bg-purple-500 animate-pulse"></span>
         </button>
 
         <button
@@ -905,7 +918,7 @@ export default function App() {
           className="flex flex-col items-center gap-0.5 p-1 rounded-xl text-slate-500 dark:text-slate-400 transition cursor-pointer"
         >
           <Menu className="w-5 h-5" />
-          <span className="text-[10px] font-bold">All Pages</span>
+          <span className="text-[10px] font-bold">Menu</span>
         </button>
       </div>
 

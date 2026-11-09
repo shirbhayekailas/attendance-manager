@@ -55,6 +55,13 @@ export default function Sidebar({
           badgeColor: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20',
         },
         {
+          id: 'reports',
+          label: 'Attendance & Payroll Reports',
+          icon: FileSpreadsheet,
+          badge: 'Report 📊',
+          badgeColor: 'bg-blue-500/20 text-blue-600 dark:text-blue-300 border border-blue-500/40 font-black',
+        },
+        {
           id: 'kiosk',
           label: 'Biometric Punch Terminal',
           icon: Clock,
@@ -92,12 +99,6 @@ export default function Sidebar({
           icon: CalendarDays,
           badge: pendingLeavesCount > 0 ? `${pendingLeavesCount} Pending` : null,
           badgeColor: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-bold',
-        },
-        {
-          id: 'reports',
-          label: 'Payroll & Timesheet Ledger',
-          icon: FileSpreadsheet,
-          badge: null,
         },
         {
           id: 'performance',

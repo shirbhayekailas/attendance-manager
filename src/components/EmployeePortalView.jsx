@@ -73,10 +73,13 @@ export default function EmployeePortalView({
   const [isApplyLeaveOpen, setIsApplyLeaveOpen] = useState(false);
   const [isSalarySlipModalOpen, setIsSalarySlipModalOpen] = useState(false);
 
-  // Monthly Timesheet State
+  // Monthly & Custom Period Timesheet State
   const todayDate = new Date();
+  const [empPeriodMode, setEmpPeriodMode] = useState('month'); // 'month' | 'custom'
   const [selectedYear, setSelectedYear] = useState(todayDate.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(todayDate.getMonth());
+  const [empCustomStart, setEmpCustomStart] = useState(() => `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-01`);
+  const [empCustomEnd, setEmpCustomEnd] = useState(() => todayDate.toISOString().split('T')[0]);
   const [sheetViewMode, setSheetViewMode] = useState('calendar'); // 'calendar' | 'table'
   const [selectedCalendarDateStr, setSelectedCalendarDateStr] = useState(() => todayDate.toISOString().split('T')[0]);
   const [leaveForm, setLeaveForm] = useState({
@@ -327,7 +330,7 @@ export default function EmployeePortalView({
             }`}
           >
             <CalendarDays className="w-3.5 h-3.5" />
-            <span>Monthly Sheet</span>
+            <span>📊 Attendance Report</span>
           </button>
           {isLeaveApplicable && (
             <button
@@ -602,15 +605,35 @@ export default function EmployeePortalView({
         </div>
       )}
 
-      {/* TAB: MY MONTHLY ATTENDANCE REGISTER */}
+      {/* TAB: MY MONTHLY & CUSTOM PERIOD ATTENDANCE REPORT */}
       {activeTab === 'monthly' && (() => {
         const daysInSelectedMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
-        const daysInMonth = daysInSelectedMonth;
         const selectedMonthName = new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' });
         
         // Offset so Monday is 0
         const firstDayOfWeek = new Date(selectedYear, selectedMonth, 1).getDay();
         const startOffset = (firstDayOfWeek + 6) % 7;
+
+        const targetDateObjs = [];
+        if (empPeriodMode === 'custom' && empCustomStart && empCustomEnd) {
+          const sObj = new Date(empCustomStart + 'T00:00:00');
+          const eObj = new Date(empCustomEnd + 'T00:00:00');
+          if (sObj <= eObj) {
+            const cur = new Date(sObj);
+            let safety = 0;
+            while (cur <= eObj && safety < 95) {
+              targetDateObjs.push(new Date(cur));
+              cur.setDate(cur.getDate() + 1);
+              safety++;
+            }
+          }
+        } else {
+          for (let d = 1; d <= daysInSelectedMonth; d++) {
+            targetDateObjs.push(new Date(selectedYear, selectedMonth, d));
+          }
+        }
+
+        const daysInMonth = targetDateObjs.length || daysInSelectedMonth;
 
         const monthlyDayList = [];
         let mOffice = 0;
@@ -622,16 +645,16 @@ export default function EmployeePortalView({
         let mWeekOff = 0;
         const weekMap = {};
 
-        for (let d = 1; d <= daysInSelectedMonth; d++) {
-          const dObj = new Date(selectedYear, selectedMonth, d);
+        targetDateObjs.forEach((dObj) => {
+          const d = dObj.getDate();
           const dayOfWeek = dObj.getDay();
           const mondayOffset = (dayOfWeek + 6) % 7;
-          const mondayDate = new Date(selectedYear, selectedMonth, d - mondayOffset);
+          const mondayDate = new Date(dObj.getFullYear(), dObj.getMonth(), d - mondayOffset);
           const weekKey = mondayDate.toISOString().split('T')[0];
           if (!weekMap[weekKey]) weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
 
           const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-          const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+          const dateStr = `${dObj.getFullYear()}-${String(dObj.getMonth() + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
           const rec = attendance[dateStr]?.[employee.id];
 
           let status = rec?.status || (isWeekend ? 'weekend' : 'none');
@@ -672,7 +695,7 @@ export default function EmployeePortalView({
               : (rec?.workingHours || '--'),
             note: rec?.note || '',
           });
-        }
+        });
 
         let mEarnedWeekOff = 0;
         Object.values(weekMap).forEach((w) => {
@@ -699,53 +722,111 @@ export default function EmployeePortalView({
               }
             `}</style>
 
-            {/* Monthly Header & Navigation Card */}
+            {/* Monthly & Custom Period Header & Navigation Card */}
             <div className="no-print bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
               <div>
                 <h3 className="font-black text-slate-900 dark:text-white text-lg flex items-center gap-2">
                   <CalendarDays className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                  <span>My Monthly Attendance Sheet</span>
+                  <span>My Attendance Report (Month-Wise &amp; Custom Period)</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Complete day-by-day record of punches, sessions, and time-off for {selectedMonthName} {selectedYear}
+                  {empPeriodMode === 'custom'
+                    ? `Custom Period: ${empCustomStart} to ${empCustomEnd} (${daysInMonth} Days)`
+                    : `Complete day-by-day record of punches, sessions, and time-off for ${selectedMonthName} ${selectedYear}`}
                 </p>
               </div>
 
-              {/* Month Switcher & Controls */}
+              {/* Month / Custom Switcher & Controls */}
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/80 dark:border-slate-700/80">
+                {/* Mode Toggle */}
+                <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bold gap-1">
                   <button
-                    onClick={() => {
-                      sounds.playSuccess();
-                      if (selectedMonth === 0) {
-                        setSelectedMonth(11);
-                        setSelectedYear(selectedYear - 1);
-                      } else {
-                        setSelectedMonth(selectedMonth - 1);
-                      }
-                    }}
-                    className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                    type="button"
+                    onClick={() => { sounds.playSuccess(); setEmpPeriodMode('month'); }}
+                    className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                      empPeriodMode === 'month' ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-500'
+                    }`}
                   >
-                    <ChevronLeft className="w-4 h-4" />
+                    Month-Wise
                   </button>
-                  <span className="px-3 text-xs font-bold text-slate-900 dark:text-white min-w-[120px] text-center">
-                    {selectedMonthName} {selectedYear}
-                  </span>
                   <button
-                    onClick={() => {
-                      sounds.playSuccess();
-                      if (selectedMonth === 11) {
-                        setSelectedMonth(0);
-                        setSelectedYear(selectedYear + 1);
-                      } else {
-                        setSelectedMonth(selectedMonth + 1);
-                      }
-                    }}
-                    className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
+                    type="button"
+                    onClick={() => { sounds.playSuccess(); setEmpPeriodMode('custom'); setSheetViewMode('table'); }}
+                    className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                      empPeriodMode === 'custom' ? 'bg-purple-600 text-white shadow-2xs' : 'text-slate-500'
+                    }`}
                   >
-                    <ChevronRight className="w-4 h-4" />
+                    Custom Period
                   </button>
                 </div>
+
+                {empPeriodMode === 'month' ? (
+                  <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/80 dark:border-slate-700/80">
+                    <button
+                      onClick={() => {
+                        sounds.playSuccess();
+                        if (selectedMonth === 0) {
+                          setSelectedMonth(11);
+                          setSelectedYear(selectedYear - 1);
+                        } else {
+                          setSelectedMonth(selectedMonth - 1);
+                        }
+                      }}
+                      className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => { sounds.playSuccess(); setSelectedMonth(Number(e.target.value)); }}
+                      className="bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-600 outline-none cursor-pointer"
+                    >
+                      {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, idx) => (
+                        <option key={m} value={idx}>{m}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => { sounds.playSuccess(); setSelectedYear(Number(e.target.value)); }}
+                      className="bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-600 outline-none cursor-pointer font-mono"
+                    >
+                      {[2024, 2025, 2026, 2027, 2028].map(yr => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => {
+                        sounds.playSuccess();
+                        if (selectedMonth === 11) {
+                          setSelectedMonth(0);
+                          setSelectedYear(selectedYear + 1);
+                        } else {
+                          setSelectedMonth(selectedMonth + 1);
+                        }
+                      }}
+                      className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 flex-wrap bg-purple-50/70 dark:bg-purple-950/40 rounded-2xl p-1.5 border border-purple-200 dark:border-purple-800 text-xs">
+                    <span className="font-bold text-purple-700 dark:text-purple-300 pl-1">From:</span>
+                    <input
+                      type="date"
+                      value={empCustomStart}
+                      onChange={(e) => setEmpCustomStart(e.target.value)}
+                      className="px-2 py-1 rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 font-mono font-bold text-slate-900 dark:text-white"
+                    />
+                    <span className="font-bold text-purple-700 dark:text-purple-300">To:</span>
+                    <input
+                      type="date"
+                      value={empCustomEnd}
+                      onChange={(e) => setEmpCustomEnd(e.target.value)}
+                      className="px-2 py-1 rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 font-mono font-bold text-slate-900 dark:text-white"
+                    />
+                  </div>
+                )}
 
                 {/* View Mode Toggle */}
                 <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 text-xs font-bold">

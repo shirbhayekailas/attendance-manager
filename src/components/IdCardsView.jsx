@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import QRCode from 'qrcode';
-import html2pdf from 'html2pdf.js';
+import { jsPDF } from 'jspdf';
 import { 
   Contact, 
   Printer, 
@@ -27,13 +27,13 @@ import {
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
 
-// Safe inline SVG avatar generator (100% immune to CORS taint & offline errors)
+// Safe inline SVG avatar generator
 export function getInitialsSvgDataUri(name, bg = '#1e3a8a') {
   const parts = String(name || 'Staff').trim().split(/\s+/);
   const initials = parts.length >= 2 
     ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     : (name || 'SP').slice(0, 2).toUpperCase();
-  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="100%" height="100%" rx="24" fill="${encodeURIComponent(bg)}"/><text x="50%" y="54%" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="62" fill="%23ffffff" dominant-baseline="middle" text-anchor="middle">${initials}</text></svg>`;
+  return `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160"><rect width="100%" height="160" rx="24" fill="${encodeURIComponent(bg)}"/><text x="50%" y="54%" font-family="system-ui, -apple-system, sans-serif" font-weight="900" font-size="62" fill="%23ffffff" dominant-baseline="middle" text-anchor="middle">${initials}</text></svg>`;
 }
 
 export default function IdCardsView({ 
@@ -107,7 +107,7 @@ export default function IdCardsView({
         });
         try {
           const url = await QRCode.toDataURL(payload, {
-            width: 140,
+            width: 220,
             margin: 1,
             color: {
               dark: '#0f172a',
@@ -152,8 +152,378 @@ export default function IdCardsView({
     window.print();
   };
 
-  const isMobileDevice = () => {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth < 768;
+  // Pure Native 2D Canvas ID Card Renderer (Instant ~15ms, Zero DOM Cloning, Zero html2canvas/oklch Crash)
+  const renderIdCardPairToCanvas = async (emp) => {
+    const scale = 3; // 300 DPI ultra-crisp output
+    const cardW = 245;
+    const cardH = 360;
+    const pad = 20;
+    const gap = 24;
+    const totalW = pad * 2 + cardW * 2 + gap;
+    const totalH = pad * 2 + cardH;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = totalW * scale;
+    canvas.height = totalH * scale;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, totalW, totalH);
+
+    const themeColors = {
+      navy: { c1: '#0f172a', c2: '#1e3a8a', c3: '#1e1b4b', r1: '#2563eb', r2: '#4f46e5' },
+      emerald: { c1: '#022c22', c2: '#064e3b', c3: '#134e4a', r1: '#059669', r2: '#0d9488' },
+      crimson: { c1: '#4c0519', c2: '#881337', c3: '#451a03', r1: '#e11d48', r2: '#d97706' },
+      sapphire: { c1: '#1e3a8a', c2: '#075985', c3: '#312e81', r1: '#2563eb', r2: '#0ea5e9' },
+      slate: { c1: '#0f172a', c2: '#18181b', c3: '#171717', r1: '#334155', r2: '#0f172a' }
+    };
+    const tc = themeColors[cardTheme] || themeColors.navy;
+
+    const drawRoundRect = (x, y, w, h, r) => {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    };
+
+    const loadImgSafe = (src) => new Promise((resolve) => {
+      if (!src) return resolve(null);
+      const img = new Image();
+      const timer = setTimeout(() => resolve(null), 1200);
+      img.onload = () => { clearTimeout(timer); resolve(img); };
+      img.onerror = () => { clearTimeout(timer); resolve(null); };
+      img.src = src;
+    });
+
+    const truncateText = (text, maxW) => {
+      let str = String(text || '');
+      if (ctx.measureText(str).width <= maxW) return str;
+      while (str.length > 0 && ctx.measureText(str + '…').width > maxW) {
+        str = str.slice(0, -1);
+      }
+      return str + '…';
+    };
+
+    // ================= 1. FRONT CARD =================
+    const fx = pad;
+    const fy = pad;
+
+    ctx.save();
+    drawRoundRect(fx, fy, cardW, cardH, 16);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.clip();
+
+    // Header Gradient
+    const hGrad = ctx.createLinearGradient(fx, fy, fx + cardW, fy + 64);
+    hGrad.addColorStop(0, tc.c1);
+    hGrad.addColorStop(0.5, tc.c2);
+    hGrad.addColorStop(1, tc.c3);
+    ctx.fillStyle = hGrad;
+    ctx.fillRect(fx, fy, cardW, 64);
+
+    // Lanyard slot
+    drawRoundRect(fx + (cardW - 32) / 2, fy + 10, 32, 9, 4.5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Company Name
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 13px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(truncateText((config.companyName || 'SK ENTERPRISES').toUpperCase(), cardW - 24), fx + cardW / 2, fy + 36);
+
+    ctx.fillStyle = '#bfdbfe';
+    ctx.font = '700 9px system-ui, -apple-system, sans-serif';
+    ctx.fillText('STAFF IDENTITY CARD', fx + cardW / 2, fy + 51);
+
+    // Avatar Box
+    const avSize = 78;
+    const avX = fx + (cardW - avSize) / 2;
+    const avY = fy + 76;
+
+    ctx.save();
+    drawRoundRect(avX, avY, avSize, avSize, 16);
+    ctx.clip();
+
+    const hasLocalAvatar = emp.avatar && (emp.avatar.startsWith('data:image/') || emp.avatar.startsWith('blob:'));
+    const avatarImg = hasLocalAvatar ? await loadImgSafe(emp.avatar) : null;
+    if (avatarImg) {
+      ctx.drawImage(avatarImg, avX, avY, avSize, avSize);
+    } else {
+      const avGrad = ctx.createLinearGradient(avX, avY + avSize, avX + avSize, avY);
+      avGrad.addColorStop(0, '#1d4ed8');
+      avGrad.addColorStop(0.5, '#4f46e5');
+      avGrad.addColorStop(1, '#9333ea');
+      ctx.fillStyle = avGrad;
+      ctx.fillRect(avX, avY, avSize, avSize);
+
+      const parts = String(emp.name || 'Staff').trim().split(/\s+/);
+      const initials = parts.length >= 2
+        ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+        : (emp.name || 'SP').slice(0, 2).toUpperCase();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 26px system-ui, -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(initials, avX + avSize / 2, avY + avSize / 2 + 1);
+      ctx.textBaseline = 'alphabetic';
+    }
+    ctx.restore();
+
+    // Avatar border
+    drawRoundRect(avX, avY, avSize, avSize, 16);
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Verified Green Dot
+    ctx.beginPath();
+    ctx.arc(avX + avSize - 2, avY + avSize - 2, 7, 0, Math.PI * 2);
+    ctx.fillStyle = '#10b981';
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+
+    // Employee Name
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '900 14.5px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(truncateText(emp.name || 'Staff Member', cardW - 24), fx + cardW / 2, fy + 174);
+
+    // Role Pill
+    const roleText = truncateText(emp.role || 'Corporate Staff', cardW - 40);
+    ctx.font = '700 10px system-ui, -apple-system, sans-serif';
+    const roleW = Math.min(cardW - 30, ctx.measureText(roleText).width + 18);
+    drawRoundRect(fx + (cardW - roleW) / 2, fy + 181, roleW, 18, 6);
+    ctx.fillStyle = '#eff6ff';
+    ctx.fill();
+    ctx.fillStyle = '#1d4ed8';
+    ctx.fillText(roleText, fx + cardW / 2, fy + 193.5);
+
+    // Divider line
+    ctx.strokeStyle = '#f1f5f9';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(fx + 14, fy + 208);
+    ctx.lineTo(fx + cardW - 14, fy + 208);
+    ctx.stroke();
+
+    // Key Attributes Rows
+    const empBlood = emp.id === activeEmployee?.id ? bloodGroup : (emp.bloodGroup || 'B+');
+    const empDoj = emp.joiningDate || emp.joinDate || 'Jan 2026';
+    const rows = [
+      { label: 'EMPLOYEE ID', val: emp.id || 'EMP-01', isBadge: true, badgeBg: '#f1f5f9', badgeFg: '#0f172a' },
+      { label: 'DEPARTMENT', val: emp.department || 'Operations' },
+      { label: 'BLOOD GROUP', val: empBlood, isBadge: true, badgeBg: '#fff1f2', badgeFg: '#e11d48' },
+      { label: 'DOJ (JOINED)', val: empDoj },
+      { label: 'VALID UPTO', val: '2028 • PERMANENT' }
+    ];
+
+    let ry = fy + 225;
+    rows.forEach((r) => {
+      ctx.textAlign = 'left';
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '800 9px system-ui, -apple-system, sans-serif';
+      ctx.fillText(r.label, fx + 15, ry);
+
+      ctx.textAlign = 'right';
+      ctx.font = '800 10px monospace, system-ui, sans-serif';
+      const valStr = truncateText(r.val, 125);
+      if (r.isBadge) {
+        const bw = ctx.measureText(valStr).width + 10;
+        drawRoundRect(fx + cardW - 15 - bw, ry - 10, bw, 14, 4);
+        ctx.fillStyle = r.badgeBg;
+        ctx.fill();
+        ctx.fillStyle = r.badgeFg;
+        ctx.fillText(valStr, fx + cardW - 15 - 5, ry);
+      } else {
+        ctx.fillStyle = '#1e293b';
+        ctx.fillText(valStr, fx + cardW - 15, ry);
+      }
+      ry += 21;
+    });
+
+    // Bottom Security Band
+    const bGrad = ctx.createLinearGradient(fx, fy + cardH - 26, fx + cardW, fy + cardH);
+    bGrad.addColorStop(0, tc.r1);
+    bGrad.addColorStop(1, tc.r2);
+    ctx.fillStyle = bGrad;
+    ctx.fillRect(fx, fy + cardH - 26, cardW, 26);
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 8.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText('★ OFFICIAL IDENTITY', fx + 12, fy + cardH - 10);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
+    ctx.font = '700 8px monospace';
+    ctx.fillText('SK-ID-VERIFIED', fx + cardW - 12, fy + cardH - 10);
+
+    ctx.restore();
+
+    // Card Outer Border
+    drawRoundRect(fx, fy, cardW, cardH, 16);
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // ================= 2. BACK CARD =================
+    const bx = pad + cardW + gap;
+    const by = pad;
+
+    ctx.save();
+    drawRoundRect(bx, by, cardW, cardH, 16);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.clip();
+
+    // Top Header
+    const bhGrad = ctx.createLinearGradient(bx, by, bx + cardW, by + 54);
+    bhGrad.addColorStop(0, tc.c1);
+    bhGrad.addColorStop(0.5, tc.c2);
+    bhGrad.addColorStop(1, tc.c3);
+    ctx.fillStyle = bhGrad;
+    ctx.fillRect(bx, by, cardW, 54);
+
+    drawRoundRect(bx + (cardW - 32) / 2, by + 10, 32, 9, 4.5);
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '900 11px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('EMERGENCY & VERIFICATION', bx + cardW / 2, by + 39);
+
+    // QR Code Frame
+    const qrBoxW = 114;
+    const qrBoxH = 122;
+    const qrBoxX = bx + (cardW - qrBoxW) / 2;
+    const qrBoxY = by + 64;
+    drawRoundRect(qrBoxX, qrBoxY, qrBoxW, qrBoxH, 12);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    let qrDataUrl = qrCodeMap[emp.id];
+    if (!qrDataUrl) {
+      try {
+        qrDataUrl = await QRCode.toDataURL(
+          JSON.stringify({ company: config.companyName || 'SK ENTERPRISES', empId: emp.id, name: emp.name }),
+          { width: 200, margin: 1 }
+        );
+      } catch (e) {}
+    }
+    const qrImg = await loadImgSafe(qrDataUrl);
+    if (qrImg) {
+      ctx.drawImage(qrImg, qrBoxX + 11, qrBoxY + 6, 92, 92);
+    }
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '800 8px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('SCAN FOR VERIFICATION', bx + cardW / 2, qrBoxY + 112);
+
+    // Emergency Contact Box
+    const contact = emp.id === activeEmployee?.id ? emergencyPhone : (emp.emergencyPhone || emp.phone || '+91 98765 43210');
+    drawRoundRect(bx + 14, by + 196, cardW - 28, 26, 8);
+    ctx.fillStyle = '#fff1f2';
+    ctx.fill();
+    ctx.strokeStyle = '#fecdd3';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#be123c';
+    ctx.font = '900 9px system-ui, -apple-system, sans-serif';
+    ctx.fillText('EMERGENCY:', bx + 22, by + 212);
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#0f172a';
+    ctx.font = '800 10px monospace, system-ui, sans-serif';
+    ctx.fillText(truncateText(contact, 125), bx + cardW - 22, by + 212);
+
+    // Registered Office
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#334155';
+    ctx.font = '800 9px system-ui, -apple-system, sans-serif';
+    ctx.fillText('Registered Office:', bx + 14, by + 238);
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = '500 8.5px system-ui, -apple-system, sans-serif';
+    const addr = config.companyAddress || '303, Panchsheel CHS Ltd, Plot No 07, Sec-02, Taloja Phase-01, Navi Mumbai - 410208';
+    const words = addr.split(' ');
+    let line1 = '';
+    let line2 = '';
+    words.forEach((w) => {
+      if (ctx.measureText(line1 + w).width < cardW - 28) {
+        line1 += (line1 ? ' ' : '') + w;
+      } else {
+        line2 += (line2 ? ' ' : '') + w;
+      }
+    });
+    ctx.fillText(line1, bx + 14, by + 250);
+    if (line2) ctx.fillText(truncateText(line2, cardW - 28), bx + 14, by + 261);
+
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = 'italic 7.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(`* Property of ${config.companyName || 'SK ENTERPRISES'}.`, bx + 14, by + 277);
+    ctx.fillText('If found, please return to the registered office above.', bx + 14, by + 287);
+
+    // Authorized Signatory Line
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(bx + 14, by + 298);
+    ctx.lineTo(bx + cardW - 14, by + 298);
+    ctx.stroke();
+
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#94a3b8';
+    ctx.font = '600 7.5px monospace';
+    ctx.fillText('Issued by HR', bx + 14, by + 313);
+    ctx.fillStyle = '#334155';
+    ctx.font = '900 8.5px system-ui, -apple-system, sans-serif';
+    ctx.fillText(truncateText((config.companyName || 'SK ENTERPRISES').toUpperCase(), 105), bx + 14, by + 324);
+
+    ctx.strokeStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.moveTo(bx + cardW - 95, by + 313);
+    ctx.lineTo(bx + cardW - 14, by + 313);
+    ctx.stroke();
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = '#475569';
+    ctx.font = '800 8px system-ui, -apple-system, sans-serif';
+    ctx.fillText('Authorized Signatory', bx + cardW - 14, by + 324);
+
+    // Bottom Confidential Band
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(bx, by + cardH - 22, cardW, 22);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '700 8px monospace';
+    ctx.fillText('CONFIDENTIAL & NON-TRANSFERABLE', bx + cardW / 2, by + cardH - 8);
+
+    ctx.restore();
+
+    drawRoundRect(bx, by, cardW, cardH, 16);
+    ctx.strokeStyle = '#cbd5e1';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    return canvas;
   };
 
   const handleDownloadSinglePdf = async () => {
@@ -161,39 +531,31 @@ export default function IdCardsView({
     try {
       sounds.playSuccess();
       setIsGeneratingPdf(true);
-      const element = document.getElementById('printable-id-card-export') || document.getElementById('printable-single-id-card');
-      if (!element) throw new Error('ID card element not found');
 
+      const canvas = await renderIdCardPairToCanvas(activeEmployee);
+      const imgData = canvas.toDataURL('image/jpeg', 0.98);
       const filename = `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.pdf`;
-      const opt = {
-        margin: [8, 8, 8, 8],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
-          allowTaint: true, 
-          logging: false,
-          backgroundColor: '#ffffff'
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
-      };
 
-      await html2pdf().set(opt).from(element).save();
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      // Draw header title on PDF
+      pdf.setFontSize(11);
+      pdf.setTextColor(30, 41, 59);
+      pdf.text(`${config.companyName || 'SK ENTERPRISES'} - OFFICIAL EMPLOYEE ID CARD (${activeEmployee.name} • ${activeEmployee.id})`, 148.5, 18, { align: 'center' });
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('Standard CR80 Size • Cut along card borders and laminate (Front & Back)', 148.5, 24, { align: 'center' });
+
+      // Add high-res card pair centered
+      const printW = 190;
+      const printH = (canvas.height / canvas.width) * printW;
+      pdf.addImage(imgData, 'JPEG', (297 - printW) / 2, 32, printW, printH);
+      pdf.save(filename);
+
       onSaveToast(`ID Card PDF downloaded for ${activeEmployee.name}!`);
     } catch (err) {
-      console.warn('PDF export error:', err);
-      // Fallback: try generating PNG image if PDF creation is blocked
-      try {
-        await handleDownloadSinglePng();
-      } catch (fallbackErr) {
-        if (!isMobileDevice()) {
-          window.print();
-          onSaveToast('Print / Save as PDF opened as fallback');
-        } else {
-          onSaveToast('PDF generation failed on mobile. Tap "Image (PNG)" to save your card.');
-        }
-      }
+      console.error('PDF export error:', err);
+      onSaveToast('Could not generate PDF. Trying PNG image...');
+      await handleDownloadSinglePng();
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -204,30 +566,14 @@ export default function IdCardsView({
     try {
       sounds.playSuccess();
       setIsGeneratingPdf(true);
-      const element = document.getElementById('printable-id-card-export') || document.getElementById('printable-single-id-card');
-      if (!element) throw new Error('Card element not found');
 
-      const worker = html2pdf().from(element).set({
-        html2canvas: { 
-          scale: 2, 
-          useCORS: true, 
-          allowTaint: true, 
-          logging: false,
-          backgroundColor: '#ffffff'
-        }
-      });
-      const canvas = await worker.toCanvas();
-      
-      const blob = await new Promise((resolve) => {
-        canvas.toBlob((b) => resolve(b), 'image/png', 1.0);
-      });
-
+      const canvas = await renderIdCardPairToCanvas(activeEmployee);
+      const blob = await new Promise((resolve) => canvas.toBlob((b) => resolve(b), 'image/png', 1.0));
       if (!blob) throw new Error('Canvas to Blob failed');
 
       const filename = `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.png`;
       const blobUrl = URL.createObjectURL(blob);
 
-      // Open visual save & preview modal for mobile devices
       setMobilePreviewModal({
         url: blobUrl,
         blob: blob,
@@ -235,7 +581,6 @@ export default function IdCardsView({
         employeeName: activeEmployee.name
       });
 
-      // Also trigger browser file download via Blob URL
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = filename;
@@ -245,9 +590,9 @@ export default function IdCardsView({
         document.body.removeChild(a);
       }, 1500);
 
-      onSaveToast(`ID Card image generated for ${activeEmployee.name}!`);
+      onSaveToast(`ID Card image downloaded for ${activeEmployee.name}!`);
     } catch (err) {
-      console.warn('PNG export error:', err);
+      console.error('PNG export error:', err);
       onSaveToast('Could not save image directly. Please try again.');
     } finally {
       setIsGeneratingPdf(false);
@@ -258,34 +603,40 @@ export default function IdCardsView({
     try {
       sounds.playSuccess();
       setIsGeneratingPdf(true);
-      const element = document.getElementById('printable-a4-sheet');
-      if (!element) return;
+
+      const list = filteredEmployees.length > 0 ? filteredEmployees : employees;
+      if (!list || list.length === 0) return;
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      const perPage = 3;
+
+      for (let i = 0; i < list.length; i++) {
+        if (i > 0 && i % perPage === 0) {
+          pdf.addPage();
+        }
+        const slot = i % perPage;
+        if (slot === 0) {
+          pdf.setFontSize(10);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text(`${config.companyName || 'SK ENTERPRISES'} • OFFICIAL ID CARDS SHEET (Page ${Math.floor(i / perPage) + 1})`, 105, 10, { align: 'center' });
+        }
+
+        const canvas = await renderIdCardPairToCanvas(list[i]);
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const w = 135;
+        const h = (canvas.height / canvas.width) * w;
+        const x = (210 - w) / 2;
+        const y = 14 + slot * (h + 4);
+        pdf.addImage(imgData, 'JPEG', x, y, w, h);
+      }
 
       const filename = `Employee_ID_Cards_A4_Sheet_${new Date().toISOString().split('T')[0]}.pdf`;
-      const opt = {
-        margin: [4, 4, 4, 4],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 1.5, 
-          useCORS: true, 
-          allowTaint: true, 
-          logging: false,
-          backgroundColor: '#ffffff'
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-      };
-
-      await html2pdf().set(opt).from(element).save();
+      pdf.save(filename);
       onSaveToast('Bulk ID Cards A4 Sheet PDF downloaded!');
     } catch (err) {
-      console.warn('Bulk PDF error:', err);
-      if (!isMobileDevice()) {
-        window.print();
-        onSaveToast('Print dialog opened as fallback');
-      } else {
-        onSaveToast('Bulk A4 download failed. Please use Single Preview.');
-      }
+      console.error('Bulk PDF error:', err);
+      onSaveToast('Bulk PDF error. Opening print view...');
+      window.print();
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -626,39 +977,6 @@ export default function IdCardsView({
         </div>
       </div>
 
-      {/* Clean Export Container for 100% Reliable PDF & PNG Export (Behind page, zero touch interference) */}
-      <div 
-        style={{ 
-          position: 'fixed', 
-          left: '0px', 
-          top: '0px', 
-          width: '560px', 
-          zIndex: -50,
-          pointerEvents: 'none',
-          opacity: 1,
-          overflow: 'hidden',
-          backgroundColor: '#ffffff'
-        }}
-        aria-hidden="true"
-      >
-        <div 
-          id="printable-id-card-export"
-          style={{ 
-            width: '560px', 
-            backgroundColor: '#ffffff', 
-            padding: '16px',
-            boxSizing: 'border-box'
-          }}
-        >
-          {activeEmployee && (
-            <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: '20px' }}>
-              {renderIdCardFront(activeEmployee, true)}
-              {renderIdCardBack(activeEmployee, true)}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Control Ribbon: Employee Selection, Department Filter, and Color Theme */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
         
@@ -763,7 +1081,36 @@ export default function IdCardsView({
               )}
             </div>
 
-            <p className="text-[11px] text-slate-400 mt-4 text-center max-w-md">
+            {/* Instant 1-Tap Download Bar directly below Card Preview */}
+            {activeEmployee && (
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3 w-full">
+                <button
+                  onClick={handleDownloadSinglePdf}
+                  disabled={isGeneratingPdf}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs shadow-lg shadow-blue-600/30 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-4 h-4" />
+                  <span>{isGeneratingPdf ? 'Downloading...' : 'Download ID Card (PDF)'}</span>
+                </button>
+                <button
+                  onClick={handleDownloadSinglePng}
+                  disabled={isGeneratingPdf}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs shadow-lg shadow-purple-600/30 transition active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                  <span>Download Image (PNG)</span>
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs shadow-md transition active:scale-95 cursor-pointer"
+                >
+                  <Printer className="w-4 h-4 text-blue-400" />
+                  <span>Print Card</span>
+                </button>
+              </div>
+            )}
+
+            <p className="text-[11px] text-slate-400 mt-3 text-center max-w-md">
               * Standard CR80 Size (54mm x 85.6mm). Designed to fit inside standard employee badge holders and vertical lanyards.
             </p>
           </div>

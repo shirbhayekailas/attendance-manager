@@ -37,8 +37,11 @@ export default function MonthlyAttendanceView({
   onNavigate
 }) {
   const today = new Date();
+  const [periodMode, setPeriodMode] = useState('month'); // 'month' | 'custom'
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth()); // 0-indexed
+  const [customStartDate, setCustomStartDate] = useState(() => `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`);
+  const [customEndDate, setCustomEndDate] = useState(() => today.toISOString().split('T')[0]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDept, setSelectedDept] = useState('All');
   const [editingCell, setEditingCell] = useState(null); // { empId, empName, dateStr, currentStatus }
@@ -151,26 +154,54 @@ export default function MonthlyAttendanceView({
     setSelectedMonth(today.getMonth());
   };
 
-  // Calculate days in the selected month
+  // Calculate days in the selected month or custom range
   const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
   const monthName = new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' });
 
   // Generate list of day objects
   const monthDays = [];
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateObj = new Date(selectedYear, selectedMonth, d);
-    const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 6 is Saturday
-    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-    const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const weekdayShort = dateObj.toLocaleDateString(undefined, { weekday: 'narrow' });
+  if (periodMode === 'custom' && customStartDate && customEndDate) {
+    const startObj = new Date(customStartDate + 'T00:00:00');
+    const endObj = new Date(customEndDate + 'T00:00:00');
+    if (startObj <= endObj) {
+      const cur = new Date(startObj);
+      let safety = 0;
+      while (cur <= endObj && safety < 95) {
+        const d = cur.getDate();
+        const dayOfWeek = cur.getDay();
+        const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+        const yStr = cur.getFullYear();
+        const mStr = String(cur.getMonth() + 1).padStart(2, '0');
+        const dStr = String(d).padStart(2, '0');
+        const dateStr = `${yStr}-${mStr}-${dStr}`;
+        const weekdayShort = cur.toLocaleDateString(undefined, { weekday: 'narrow' });
+        monthDays.push({
+          dayNum: d,
+          dateStr,
+          isWeekend,
+          dayOfWeek,
+          weekdayShort,
+        });
+        cur.setDate(cur.getDate() + 1);
+        safety++;
+      }
+    }
+  } else {
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(selectedYear, selectedMonth, d);
+      const dayOfWeek = dateObj.getDay(); // 0 is Sunday, 6 is Saturday
+      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+      const dateStr = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const weekdayShort = dateObj.toLocaleDateString(undefined, { weekday: 'narrow' });
 
-    monthDays.push({
-      dayNum: d,
-      dateStr,
-      isWeekend,
-      dayOfWeek,
-      weekdayShort,
-    });
+      monthDays.push({
+        dayNum: d,
+        dateStr,
+        isWeekend,
+        dayOfWeek,
+        weekdayShort,
+      });
+    }
   }
 
   // Filter employees
@@ -431,49 +462,126 @@ export default function MonthlyAttendanceView({
 
         {/* Action controls */}
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Month Navigator */}
-          <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/80 dark:border-slate-700/80">
+          {/* Period Mode Toggle: Month-Wise vs Custom Period */}
+          <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold gap-1">
             <button
-              onClick={handlePrevMonth}
-              className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-              title="Previous Month"
+              type="button"
+              onClick={() => { sounds.playSuccess(); setPeriodMode('month'); }}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                periodMode === 'month'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
             >
-              <ChevronLeft className="w-4 h-4" />
+              Month-Wise
             </button>
-
-            <span className="px-3 text-xs font-bold text-slate-900 dark:text-white min-w-[130px] text-center">
-              {monthName} {selectedYear}
-            </span>
-
             <button
-              onClick={handleNextMonth}
-              className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
-              title="Next Month"
+              type="button"
+              onClick={() => { sounds.playSuccess(); setPeriodMode('custom'); }}
+              className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                periodMode === 'custom'
+                  ? 'bg-purple-600 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
+              }`}
             >
-              <ChevronRight className="w-4 h-4" />
+              Custom Period (From - To)
             </button>
           </div>
 
-          {/* Daily vs Monthly Switcher */}
+          {periodMode === 'month' ? (
+            /* Month & Year Navigator with Dropdowns */
+            <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200/80 dark:border-slate-700/80">
+              <button
+                onClick={handlePrevMonth}
+                className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                title="Previous Month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              <select
+                value={selectedMonth}
+                onChange={(e) => { sounds.playSuccess(); setSelectedMonth(Number(e.target.value)); }}
+                className="bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-600 outline-none cursor-pointer"
+              >
+                {['January','February','March','April','May','June','July','August','September','October','November','December'].map((m, idx) => (
+                  <option key={m} value={idx}>{m}</option>
+                ))}
+              </select>
+
+              <select
+                value={selectedYear}
+                onChange={(e) => { sounds.playSuccess(); setSelectedYear(Number(e.target.value)); }}
+                className="bg-white dark:bg-slate-700 text-slate-900 dark:text-white text-xs font-bold px-2 py-1.5 rounded-xl border border-slate-200 dark:border-slate-600 outline-none cursor-pointer font-mono"
+              >
+                {[2024, 2025, 2026, 2027, 2028].map(yr => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+
+              <button
+                onClick={handleNextMonth}
+                className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                title="Next Month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          ) : (
+            /* Custom Date Range Picker (From Date - To Date) */
+            <div className="flex items-center gap-1.5 flex-wrap bg-purple-50/70 dark:bg-purple-950/40 rounded-2xl p-1.5 border border-purple-200 dark:border-purple-800 text-xs">
+              <span className="font-bold text-purple-700 dark:text-purple-300 pl-1">From:</span>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="px-2 py-1 rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 font-mono font-bold text-slate-900 dark:text-white"
+              />
+              <span className="font-bold text-purple-700 dark:text-purple-300">To:</span>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="px-2 py-1 rounded-xl bg-white dark:bg-slate-800 border border-purple-200 dark:border-purple-700 font-mono font-bold text-slate-900 dark:text-white"
+              />
+              <span className="px-2 py-0.5 rounded-lg bg-purple-600 text-white font-black text-[10px]">
+                {monthDays.length} Days
+              </span>
+            </div>
+          )}
+
+          {/* Daily vs Monthly vs Report Switcher */}
           {onNavigate && (
-            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold">
+            <div className="flex flex-wrap p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 text-xs font-bold gap-1">
               <button
                 type="button"
                 onClick={() => {
                   sounds.playSuccess();
                   onNavigate('mark');
                 }}
-                className="px-3 py-1.5 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-xl text-slate-500 hover:text-slate-800 dark:hover:text-white transition-all flex items-center gap-1.5 cursor-pointer"
                 title="Switch to Daily Roster"
               >
                 <span>Daily</span>
               </button>
               <button
                 type="button"
-                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-2xs flex items-center gap-1.5 font-black"
+                className="px-3 py-1.5 rounded-xl bg-white dark:bg-slate-700 text-blue-600 dark:text-white shadow-2xs flex items-center gap-1.5 font-black cursor-pointer"
               >
                 <CalendarDays className="w-3.5 h-3.5" />
                 <span>Monthly Muster</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sounds.playSuccess();
+                  onNavigate('reports');
+                }}
+                className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                title="Open Complete Payroll & Attendance Report (Month-Wise & Custom Period)"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>📊 Attendance Report</span>
               </button>
             </div>
           )}
