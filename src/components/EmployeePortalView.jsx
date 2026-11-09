@@ -26,10 +26,12 @@ import {
   HelpCircle,
   MessageSquare,
   Tag,
-  Contact
+  Contact,
+  Download
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { calculateEmployeeStats, calculateWorkDuration, calculateMonthlyPayrollStats } from '../utils/attendanceCalculations';
+import { downloadEmployeeAttendancePdf, downloadEmployeeAttendanceCsv } from '../utils/employeeAttendanceExport';
 import { sounds } from '../utils/sound';
 import { getEmployeeTotalAdvance, getEmployeeTotalExpenses } from '../utils/storage';
 import SalarySlipModal from './SalarySlipModal';
@@ -857,9 +859,48 @@ export default function EmployeePortalView({
                 <button
                   onClick={() => {
                     sounds.playSuccess();
+                    const pLabel = empPeriodMode === 'custom'
+                      ? `${empCustomStart} to ${empCustomEnd}`
+                      : `${selectedMonthName} ${selectedYear}`;
+                    downloadEmployeeAttendancePdf({
+                      employee,
+                      attendance,
+                      dateStrings: monthlyDayList.map(d => d.dateStr),
+                      periodLabel: pLabel,
+                      config
+                    });
+                    if (onSaveToast) onSaveToast(`Downloaded ${employee.name}'s Attendance PDF (${pLabel})`);
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/30 transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>📥 Download PDF</span>
+                </button>
+                <button
+                  onClick={() => {
+                    sounds.playSuccess();
+                    const pLabel = empPeriodMode === 'custom'
+                      ? `${empCustomStart} to ${empCustomEnd}`
+                      : `${selectedMonthName} ${selectedYear}`;
+                    downloadEmployeeAttendanceCsv({
+                      employee,
+                      attendance,
+                      dateStrings: monthlyDayList.map(d => d.dateStr),
+                      periodLabel: pLabel
+                    });
+                    if (onSaveToast) onSaveToast(`Downloaded ${employee.name}'s Attendance Excel/CSV (${pLabel})`);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/30 transition-all cursor-pointer"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>📊 Excel (CSV)</span>
+                </button>
+                <button
+                  onClick={() => {
+                    sounds.playSuccess();
                     window.print();
                   }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/30 transition-all"
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/30 transition-all cursor-pointer"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Print Sheet</span>

@@ -18,9 +18,11 @@ import {
   Printer,
   IndianRupee,
   Contact,
-  LogOut
+  LogOut,
+  Download
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
+import { downloadEmployeeAttendancePdf, downloadEmployeeAttendanceCsv } from '../utils/employeeAttendanceExport';
 import { getEmployeeTotalAdvance } from '../utils/storage';
 import { sounds } from '../utils/sound';
 import SalaryAdvanceModal from './SalaryAdvanceModal';
@@ -276,7 +278,39 @@ export default function MemberProfileModal({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 self-end sm:self-center no-print">
+            <div className="flex items-center gap-2 self-end sm:self-center no-print flex-wrap">
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  downloadEmployeeAttendancePdf({
+                    employee,
+                    attendance,
+                    dateStrings: monthlyDayList.map(d => d.dateStr),
+                    periodLabel: `${monthName} ${selectedYear}`,
+                    config
+                  });
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                title={`Download ${employee.name}'s ${monthName} ${selectedYear} Attendance Report (PDF)`}
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>📥 Attendance PDF</span>
+              </button>
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  downloadEmployeeAttendanceCsv({
+                    employee,
+                    attendance,
+                    dateStrings: monthlyDayList.map(d => d.dateStr),
+                    periodLabel: `${monthName} ${selectedYear}`
+                  });
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-md transition-all cursor-pointer"
+                title={`Download ${employee.name}'s ${monthName} ${selectedYear} Attendance Report (Excel / CSV)`}
+              >
+                <span>📊 CSV</span>
+              </button>
               {onNavigate && (
                 <button
                   onClick={() => {

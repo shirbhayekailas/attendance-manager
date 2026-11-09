@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
 import { getEmployeeTotalAdvance, getEmployeeTotalExpenses } from '../utils/storage';
+import { downloadEmployeeAttendancePdf, downloadEmployeeAttendanceCsv } from '../utils/employeeAttendanceExport';
 import { sounds } from '../utils/sound';
 import SalarySlipModal from './SalarySlipModal';
 import SalaryAdvanceModal from './SalaryAdvanceModal';
@@ -62,6 +63,7 @@ export default function ReportsView({
   const [quickDays, setQuickDays] = useState('30');
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('All');
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('ALL');
 
   const [selectedPayslipEmp, setSelectedPayslipEmp] = useState(null);
   const [advanceTargetEmp, setAdvanceTargetEmp] = useState(null);
@@ -296,12 +298,15 @@ export default function ReportsView({
     };
   });
 
-  const displayedEmployees = payrollData.filter((e) =>
-    e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    e.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const displayedEmployees = payrollData.filter((e) => {
+    const matchesEmp = selectedEmployeeId === 'ALL' || e.id === selectedEmployeeId;
+    const matchesSearch =
+      e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      e.role.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesEmp && matchesSearch;
+  });
 
   // Total Net Payroll for displayed staff (after advance deduction)
   const totalNetPayroll = displayedEmployees.reduce((acc, curr) => acc + (curr.netDisbursal ?? curr.overallStats.netEstimatedSalary), 0);
@@ -937,18 +942,38 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
           </div>
         )}
 
-        {/* Row 3: Employee Search and Department Filter */}
+        {/* Row 3: Employee Search, Individual Employee Selector, and Department Filter */}
         <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2.5 w-full sm:w-auto flex-1 flex-wrap">
-            <div className="relative w-full sm:w-72">
+            <div className="relative w-full sm:w-60">
               <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search employee by name, ID, role..."
+                placeholder="Search employee by name, ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
               />
+            </div>
+
+            {/* Individual Employee Dropdown */}
+            <div className="flex items-center gap-1.5">
+              <label className="text-slate-500 dark:text-slate-400 font-bold shrink-0">Employee:</label>
+              <select
+                value={selectedEmployeeId}
+                onChange={(e) => {
+                  sounds.playSuccess();
+                  setSelectedEmployeeId(e.target.value);
+                }}
+                className="p-2 rounded-2xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 font-extrabold text-xs outline-none cursor-pointer max-w-[210px]"
+              >
+                <option value="ALL">All Employees ({payrollData.length})</option>
+                {payrollData.map(emp => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.name} ({emp.id})
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Department Dropdown */}
@@ -968,13 +993,42 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
 
           {/* Export & Print Controls */}
           <div className="flex items-center gap-2 flex-wrap self-end sm:self-center">
+            {selectedEmployeeId !== 'ALL' && displayedEmployees[0] && (
+              <>
+                <button
+                  onClick={() => {
+                    sounds.playSuccess();
+                    downloadEmployeeAttendancePdf(displayedEmployees[0], filteredDates, attendance, config, periodTitle);
+                    onSaveToast(`Attendance PDF downloaded for ${displayedEmployees[0].name}!`);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-600/25 transition-all active:scale-95 cursor-pointer"
+                  title="Download Individual Day-by-Day Attendance PDF"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>📥 {displayedEmployees[0].name.split(' ')[0]}'s Attendance PDF</span>
+                </button>
+                <button
+                  onClick={() => {
+                    sounds.playSuccess();
+                    downloadEmployeeAttendanceCsv(displayedEmployees[0], filteredDates, attendance, config, periodTitle);
+                    onSaveToast(`Attendance CSV downloaded for ${displayedEmployees[0].name}!`);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-extrabold rounded-2xl bg-purple-600 hover:bg-purple-700 text-white shadow-md shadow-purple-600/25 transition-all active:scale-95 cursor-pointer"
+                  title="Download Individual Day-by-Day Attendance Excel/CSV"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
+                  <span>📊 Excel (CSV)</span>
+                </button>
+              </>
+            )}
+
             <button
               onClick={handleExportPayrollCSV}
               className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer"
-              title="Download CSV report for selected period"
+              title="Download Combined Summary CSV report for selected period"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Export CSV</span>
+              <span>Export All CSV</span>
             </button>
 
             <button
@@ -1176,17 +1230,41 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
                     </td>
 
                     <td className="no-print py-3 px-4 text-center">
-                      <div className="flex items-center justify-center gap-1">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            sounds.playSuccess();
+                            downloadEmployeeAttendancePdf(emp, filteredDates, attendance, config, periodTitle);
+                            onSaveToast(`Attendance PDF downloaded for ${emp.name}!`);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold shadow-xs transition-all cursor-pointer"
+                          title={`Download ${emp.name}'s Individual Attendance PDF`}
+                        >
+                          <Download className="w-3 h-3" />
+                          <span>PDF</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            sounds.playSuccess();
+                            downloadEmployeeAttendanceCsv(emp, filteredDates, attendance, config, periodTitle);
+                            onSaveToast(`Attendance CSV downloaded for ${emp.name}!`);
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-extrabold shadow-xs transition-all cursor-pointer"
+                          title={`Download ${emp.name}'s Individual Attendance Excel/CSV`}
+                        >
+                          <FileSpreadsheet className="w-3 h-3" />
+                          <span>CSV</span>
+                        </button>
                         <button
                           onClick={() => handleShareWhatsAppSlip(emp)}
-                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors"
+                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 transition-colors cursor-pointer"
                           title="Send Salary Slip via WhatsApp"
                         >
                           <MessageCircle className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => setSelectedPayslipEmp(emp)}
-                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors"
+                          className="p-1.5 rounded-lg text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950 transition-colors cursor-pointer"
                           title="View Detailed Payslip"
                         >
                           <Eye className="w-4 h-4" />
@@ -1215,6 +1293,7 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
                     </th>
                   ))}
                   <th className="p-3 text-center min-w-[90px]">Payable Days</th>
+                  <th className="no-print p-3 text-center min-w-[110px]">Download</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -1271,6 +1350,33 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
 
                     <td className="p-3 text-center font-black text-emerald-600 dark:text-emerald-400">
                       {e.payableDays}
+                    </td>
+
+                    <td className="no-print p-2 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => {
+                            sounds.playSuccess();
+                            downloadEmployeeAttendancePdf(e, filteredDates, attendance, config, periodTitle);
+                            onSaveToast(`Attendance PDF downloaded for ${e.name}!`);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold cursor-pointer"
+                          title={`Download ${e.name}'s Attendance PDF`}
+                        >
+                          PDF
+                        </button>
+                        <button
+                          onClick={() => {
+                            sounds.playSuccess();
+                            downloadEmployeeAttendanceCsv(e, filteredDates, attendance, config, periodTitle);
+                            onSaveToast(`Attendance CSV downloaded for ${e.name}!`);
+                          }}
+                          className="px-2 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-extrabold cursor-pointer"
+                          title={`Download ${e.name}'s Attendance CSV`}
+                        >
+                          CSV
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

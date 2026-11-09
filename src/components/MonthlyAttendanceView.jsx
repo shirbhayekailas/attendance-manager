@@ -24,6 +24,7 @@ import {
   Keyboard
 } from 'lucide-react';
 import { sounds } from '../utils/sound';
+import { downloadEmployeeAttendancePdf, downloadEmployeeAttendanceCsv } from '../utils/employeeAttendanceExport';
 import MonthlyRosterModal from './MonthlyRosterModal';
 import BiometricImportModal from './BiometricImportModal';
 
@@ -842,42 +843,62 @@ export default function MonthlyAttendanceView({
                 <th className="p-2.5 text-center font-black text-slate-900 dark:text-white min-w-[70px] bg-slate-100/70 dark:bg-slate-800/70" title="Total Payable Days (Includes +1 Day for each WO Duty worked)">
                   Payable
                 </th>
+                <th className="no-print p-2.5 text-center font-black text-blue-600 dark:text-blue-400 min-w-[95px] bg-blue-50/40 dark:bg-blue-950/20">
+                  Download
+                </th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredEmployees.length === 0 ? (
                 <tr>
-                  <td colSpan={monthDays.length + 7} className="p-12 text-center text-slate-400">
+                  <td colSpan={monthDays.length + 8} className="p-12 text-center text-slate-400">
                     No employees found matching filter.
                   </td>
                 </tr>
               ) : (
                 filteredEmployees.map((emp) => {
                   const stats = getEmpMonthlyStats(emp.id);
+                  const activePeriodLabel = periodMode === 'custom'
+                    ? `${customStartDate} to ${customEndDate}`
+                    : `${monthName} ${selectedYear}`;
 
                   return (
                     <tr key={emp.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors">
                       
                       {/* Fixed Staff Member Info */}
-                      <td className="p-3 sticky left-0 z-10 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center gap-2.5">
-                          <img
-                            src={emp.avatar}
-                            alt={emp.name}
-                            className="w-8 h-8 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
-                          />
-                          <div className="truncate max-w-[130px]">
-                            <button
-                              onClick={() => onSelectEmployee(emp)}
-                              className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block text-left text-xs"
-                            >
-                              {emp.name}
-                            </button>
-                            <span className="text-[10px] text-slate-400 block font-mono">
-                              {emp.id} • {emp.department}
-                            </span>
+                      <td className="p-2.5 sticky left-0 z-10 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <img
+                              src={emp.avatar}
+                              alt={emp.name}
+                              className="w-8 h-8 rounded-xl object-cover border border-slate-200 dark:border-slate-700 shrink-0"
+                            />
+                            <div className="truncate max-w-[115px]">
+                              <button
+                                onClick={() => onSelectEmployee(emp)}
+                                className="font-bold text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate block text-left text-xs cursor-pointer"
+                              >
+                                {emp.name}
+                              </button>
+                              <span className="text-[10px] text-slate-400 block font-mono truncate">
+                                {emp.id} • {emp.department}
+                              </span>
+                            </div>
                           </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playSuccess();
+                              downloadEmployeeAttendancePdf(emp, monthDays.map(d => d.dateStr), attendance, config, activePeriodLabel);
+                              onSaveToast(`Attendance PDF downloaded for ${emp.name}!`);
+                            }}
+                            className="no-print px-1.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black shrink-0 cursor-pointer shadow-2xs"
+                            title={`Download ${emp.name}'s Attendance PDF`}
+                          >
+                            📥 PDF
+                          </button>
                         </div>
                       </td>
 
@@ -1012,6 +1033,34 @@ export default function MonthlyAttendanceView({
                             (+{stats.weekOffDuty} WO-P)
                           </span>
                         )}
+                      </td>
+                      <td className="no-print p-2 text-center bg-blue-50/20 dark:bg-blue-950/10">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playSuccess();
+                              downloadEmployeeAttendancePdf(emp, monthDays.map(d => d.dateStr), attendance, config, activePeriodLabel);
+                              onSaveToast(`Attendance PDF downloaded for ${emp.name}!`);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-extrabold cursor-pointer shadow-2xs"
+                            title={`Download ${emp.name}'s Attendance PDF`}
+                          >
+                            PDF
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              sounds.playSuccess();
+                              downloadEmployeeAttendanceCsv(emp, monthDays.map(d => d.dateStr), attendance, config, activePeriodLabel);
+                              onSaveToast(`Attendance CSV downloaded for ${emp.name}!`);
+                            }}
+                            className="px-2 py-1 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-[10px] font-extrabold cursor-pointer shadow-2xs"
+                            title={`Download ${emp.name}'s Attendance CSV`}
+                          >
+                            CSV
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
