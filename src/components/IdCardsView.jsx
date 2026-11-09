@@ -166,7 +166,7 @@ export default function IdCardsView({
 
       const filename = `ID_Card_${activeEmployee.name.replace(/\s+/g, '_')}_${activeEmployee.id}.pdf`;
       const opt = {
-        margin: [6, 6, 6, 6],
+        margin: [8, 8, 8, 8],
         filename: filename,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { 
@@ -174,33 +174,25 @@ export default function IdCardsView({
           useCORS: true, 
           allowTaint: true, 
           logging: false,
-          scrollY: 0,
-          scrollX: 0,
-          windowWidth: 600
+          backgroundColor: '#ffffff'
         },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
       };
 
-      const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      }, 6000);
-
+      await html2pdf().set(opt).from(element).save();
       onSaveToast(`ID Card PDF downloaded for ${activeEmployee.name}!`);
     } catch (err) {
       console.warn('PDF export error:', err);
-      if (!isMobileDevice()) {
-        window.print();
-        onSaveToast('Print / Save as PDF opened as fallback');
-      } else {
-        onSaveToast('PDF generation failed on mobile. Tap "Image (PNG)" to save your card.');
+      // Fallback: try generating PNG image if PDF creation is blocked
+      try {
+        await handleDownloadSinglePng();
+      } catch (fallbackErr) {
+        if (!isMobileDevice()) {
+          window.print();
+          onSaveToast('Print / Save as PDF opened as fallback');
+        } else {
+          onSaveToast('PDF generation failed on mobile. Tap "Image (PNG)" to save your card.');
+        }
       }
     } finally {
       setIsGeneratingPdf(false);
@@ -221,9 +213,7 @@ export default function IdCardsView({
           useCORS: true, 
           allowTaint: true, 
           logging: false,
-          scrollY: 0,
-          scrollX: 0,
-          windowWidth: 600
+          backgroundColor: '#ffffff'
         }
       });
       const canvas = await worker.toCanvas();
@@ -281,24 +271,12 @@ export default function IdCardsView({
           useCORS: true, 
           allowTaint: true, 
           logging: false,
-          scrollY: 0,
-          scrollX: 0
+          backgroundColor: '#ffffff'
         },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
       };
 
-      const pdfBlob = await html2pdf().set(opt).from(element).output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(() => {
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      }, 6000);
-
+      await html2pdf().set(opt).from(element).save();
       onSaveToast('Bulk ID Cards A4 Sheet PDF downloaded!');
     } catch (err) {
       console.warn('Bulk PDF error:', err);
@@ -367,11 +345,11 @@ export default function IdCardsView({
   // Single ID Card Component (Front & Back)
   const renderIdCardFront = (emp, isPrint = false) => {
     if (!emp) return null;
-    const fallbackAvatar = getInitialsSvgDataUri(emp.name);
-    const hasLocalAvatar = emp.avatar && (emp.avatar.startsWith('data:') || emp.avatar.startsWith('blob:'));
-    const avatarUrl = isPrint 
-      ? (hasLocalAvatar ? emp.avatar : fallbackAvatar)
-      : (hasLocalAvatar ? emp.avatar : (emp.avatar || fallbackAvatar));
+    const parts = String(emp.name || 'Staff').trim().split(/\s+/);
+    const initials = parts.length >= 2 
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : (emp.name || 'SP').slice(0, 2).toUpperCase();
+    const hasLocalAvatar = emp.avatar && (emp.avatar.startsWith('data:image/') || emp.avatar.startsWith('blob:'));
     return (
       <div 
         className={`w-[245px] h-[360px] rounded-2xl bg-white text-slate-900 shadow-xl overflow-hidden flex flex-col justify-between border border-slate-300 relative select-none ${isPrint ? 'print-card' : ''}`}
@@ -395,16 +373,17 @@ export default function IdCardsView({
           {/* Photo Frame */}
           <div className="relative mb-2">
             <div className={`w-20 h-20 rounded-2xl overflow-hidden ring-4 ring-white shadow-md border-2 border-slate-200 bg-slate-100 flex items-center justify-center`}>
-              <img 
-                src={avatarUrl} 
-                alt={emp.name || 'Staff'} 
-                className="w-full h-full object-cover"
-                crossOrigin={avatarUrl && (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) ? 'anonymous' : undefined}
-                onError={(e) => {
-                  e.target.onerror = null;
-                  e.target.src = fallbackAvatar;
-                }}
-              />
+              {hasLocalAvatar ? (
+                <img 
+                  src={emp.avatar} 
+                  alt={emp.name || 'Staff'} 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="w-full h-full bg-gradient-to-tr from-blue-700 via-indigo-600 to-purple-600 flex items-center justify-center text-white font-black text-2xl tracking-wider select-none shadow-inner">
+                  {initials}
+                </div>
+              )}
             </div>
             <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white" title="Verified Active Staff"></span>
           </div>
@@ -647,17 +626,18 @@ export default function IdCardsView({
         </div>
       </div>
 
-      {/* Clean Offscreen Container for 100% Reliable PDF & PNG Export (Far offscreen, zero touch interference) */}
+      {/* Clean Export Container for 100% Reliable PDF & PNG Export (Behind page, zero touch interference) */}
       <div 
         style={{ 
           position: 'fixed', 
-          left: '-9999px', 
-          top: '-9999px', 
+          left: '0px', 
+          top: '0px', 
           width: '560px', 
-          zIndex: -9999,
+          zIndex: -50,
           pointerEvents: 'none',
-          opacity: 0.01,
-          overflow: 'hidden'
+          opacity: 1,
+          overflow: 'hidden',
+          backgroundColor: '#ffffff'
         }}
         aria-hidden="true"
       >

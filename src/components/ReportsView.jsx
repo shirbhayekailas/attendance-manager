@@ -8,6 +8,7 @@ import {
   CreditCard, 
   CheckCircle2, 
   Calendar, 
+  CalendarDays,
   Briefcase,
   Eye,
   X,
@@ -15,7 +16,11 @@ import {
   IndianRupee,
   MessageCircle,
   FileText,
-  Wallet
+  Wallet,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Clock
 } from 'lucide-react';
 import { calculateEmployeeStats, calculateWorkDuration } from '../utils/attendanceCalculations';
 import { getEmployeeTotalAdvance, getEmployeeTotalExpenses } from '../utils/storage';
@@ -28,7 +33,7 @@ import BulkWhatsAppModal from './BulkWhatsAppModal';
 
 export default function ReportsView({ 
   employees, 
-  attendance, 
+  attendance = {}, 
   advances = [],
   setAdvances,
   expenses = [],
@@ -39,8 +44,25 @@ export default function ReportsView({
 }) {
   const isManager = role === 'manager';
   const [activeReportTab, setActiveReportTab] = useState(isManager ? 'matrix' : 'payroll');
-  const [rangeFilter, setRangeFilter] = useState('30');
+  
+  // Period Selection: 'month' | 'custom' | 'quick'
+  const now = new Date();
+  const [periodMode, setPeriodMode] = useState('month');
+  const [selectedYear, setSelectedYear] = useState(() => now.getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState(() => now.getMonth()); // 0-indexed
+  
+  // Custom date range (default 1st of month to today)
+  const [customStartDate, setCustomStartDate] = useState(() => {
+    const d = new Date(now.getFullYear(), now.getMonth(), 1);
+    return d.toISOString().split('T')[0];
+  });
+  const [customEndDate, setCustomEndDate] = useState(() => now.toISOString().split('T')[0]);
+
+  // Quick preset timeline
+  const [quickDays, setQuickDays] = useState('30');
   const [searchQuery, setSearchQuery] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('All');
+
   const [selectedPayslipEmp, setSelectedPayslipEmp] = useState(null);
   const [advanceTargetEmp, setAdvanceTargetEmp] = useState(null);
   const [isAdvanceModalOpen, setIsAdvanceModalOpen] = useState(false);
@@ -49,18 +71,78 @@ export default function ReportsView({
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [expenseTargetEmp, setExpenseTargetEmp] = useState(null);
 
-  const now = new Date();
-  const currentMonthDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const currentMonthName = now.toLocaleString('default', { month: 'long' });
-  const currentYear = now.getFullYear();
+  // Available departments
+  const availableDepartments = ['All', ...new Set((employees || []).map(e => e?.department).filter(Boolean))];
+
+  // Helper for human-readable date
+  const formatDateDisplay = (dateStr) => {
+    if (!dateStr) return '';
+    try {
+      const [y, m, d] = dateStr.split('-');
+      const dObj = new Date(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10));
+      return dObj.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch (e) {
+      return dateStr;
+    }
+  };
 
   const allDates = Object.keys(attendance).sort();
-  const filteredDates = rangeFilter === 'all' 
-    ? allDates 
-    : allDates.slice(-parseInt(rangeFilter, 10));
 
-  // Compute payroll summary per employee
+  // Compute filteredDates and dynamic period title
+  let filteredDates = [];
+  let periodTitle = '';
+  let periodDays = 30;
+  let activeMonthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+
+  if (periodMode === 'month') {
+    const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+    periodDays = daysInMonth;
+    const mName = new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' });
+    periodTitle = `${mName} ${selectedYear} (${daysInMonth} Days)`;
+    activeMonthPrefix = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}`;
+    
+    // Generate all calendar dates for selected month
+    for (let day = 1; day <= daysInMonth; day++) {
+      filteredDates.push(`${activeMonthPrefix}-${String(day).padStart(2, '0')}`);
+    }
+  } else if (periodMode === 'custom') {
+    const sDate = customStartDate || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const eDate = customEndDate || now.toISOString().split('T')[0];
+    const startObj = new Date(sDate + 'T00:00:00');
+    const endObj = new Date(eDate + 'T00:00:00');
+    
+    if (startObj <= endObj) {
+      const cur = new Date(startObj);
+      while (cur <= endObj) {
+        filteredDates.push(cur.toISOString().split('T')[0]);
+        cur.setDate(cur.getDate() + 1);
+      }
+    } else {
+      filteredDates = [sDate];
+    }
+    periodDays = filteredDates.length;
+    periodTitle = `${formatDateDisplay(sDate)} to ${formatDateDisplay(eDate)} (${periodDays} Days)`;
+    activeMonthPrefix = sDate.slice(0, 7);
+  } else {
+    // Quick preset timeline
+    if (quickDays === 'all') {
+      filteredDates = allDates.length > 0 ? allDates : [now.toISOString().split('T')[0]];
+      periodTitle = `All Recorded Timeline (${filteredDates.length} Days)`;
+      periodDays = filteredDates.length || 30;
+    } else {
+      const numDays = parseInt(quickDays, 10) || 30;
+      filteredDates = [];
+      for (let i = numDays - 1; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(now.getDate() - i);
+        filteredDates.push(d.toISOString().split('T')[0]);
+      }
+      periodTitle = `Last ${numDays} Days (${formatDateDisplay(filteredDates[0])} to ${formatDateDisplay(filteredDates[filteredDates.length - 1])})`;
+      periodDays = numDays;
+    }
+  }
+
+  // Compute payroll & attendance stats per employee strictly for filteredDates
   const payrollData = employees.map((emp) => {
     let rangeTotal = 0;
     let rangeOffice = 0;
@@ -73,11 +155,23 @@ export default function ReportsView({
     let rangeLate = 0;
     let rangeWeekOffDuty = 0;
     let rangeOvertime = 0;
+    const weekMap = {};
 
     filteredDates.forEach((d) => {
       const rec = attendance[d]?.[emp.id];
+      const dateObj = new Date(d + 'T00:00:00');
+      const dayOfWeek = dateObj.getDay(); // 0 is Sunday
+      const isSunday = dayOfWeek === 0;
+
+      // Group calendar weeks starting on Monday for week-off rule
+      const mondayOffset = (dayOfWeek + 6) % 7;
+      const mondayDate = new Date(dateObj.getTime() - mondayOffset * 86400000);
+      const weekKey = mondayDate.toISOString().split('T')[0];
+      if (!weekMap[weekKey]) weekMap[weekKey] = { workedDays: 0, hasSundayOff: false };
+
       if (rec && rec.status) {
         rangeTotal++;
+        const status = rec.status;
         const ot = (rec.overtimeHours !== undefined && rec.overtimeHours !== null && rec.overtimeHours !== '')
           ? Number(rec.overtimeHours)
           : ((rec.clockIn && rec.clockOut && rec.clockIn !== '--' && rec.clockOut !== '--')
@@ -85,57 +179,116 @@ export default function ReportsView({
             : 0);
         rangeOvertime += ot;
 
-        const dateObj = new Date(d + 'T00:00:00');
-        const isSunday = dateObj.getDay() === 0;
-        const isWODuty = rec.isWeekOffDuty || rec.status === 'week_off_present' || rec.status === 'wo_present' || ((rec.status === 'present' || rec.status === 'late' || rec.status === 'wfh') && isSunday) || /week.?off|sunday|wo/i.test(rec.note || '');
+        const isWODuty = rec.isWeekOffDuty || status === 'week_off_present' || status === 'wo_present' || ((status === 'present' || status === 'late' || status === 'wfh') && isSunday) || /week.?off|sunday|wo/i.test(rec.note || '');
 
-        if (rec.status === 'present') {
+        if (status === 'present') {
           rangeOffice++;
           if (isWODuty) rangeWeekOffDuty++;
-        }
-        else if (rec.status === 'wfh') {
+          if (!isSunday) weekMap[weekKey].workedDays++;
+        } else if (status === 'wfh') {
           rangeWFH++;
           if (isWODuty) rangeWeekOffDuty++;
-        }
-        else if (rec.status === 'late') {
+          if (!isSunday) weekMap[weekKey].workedDays++;
+        } else if (status === 'late') {
           rangeOffice++;
           rangeLate++;
           if (isWODuty) rangeWeekOffDuty++;
-        }
-        else if (rec.status === 'half_day') rangeHalfDay++;
-        else if (rec.status === 'leave') rangeLeave++;
-        else if (rec.status === 'absent') rangeAbsent++;
-        else if (rec.status === 'week_off' || rec.status === 'wo') rangeWeekOff++;
-        else if (rec.status === 'holiday' || rec.status === 'ph') rangeHoliday++;
-        else if (rec.status === 'week_off_present' || rec.status === 'wo_present') {
+          if (!isSunday) weekMap[weekKey].workedDays++;
+        } else if (status === 'half_day') {
+          rangeHalfDay++;
+        } else if (status === 'leave') {
+          rangeLeave++;
+        } else if (status === 'absent') {
+          rangeAbsent++;
+        } else if (status === 'week_off' || status === 'wo' || status === 'none') {
+          rangeWeekOff++;
+          if (isSunday) weekMap[weekKey].hasSundayOff = true;
+        } else if (status === 'holiday' || status === 'ph') {
+          rangeHoliday++;
+        } else if (status === 'week_off_present' || status === 'wo_present') {
           rangeOffice++;
           rangeWeekOffDuty++;
+          if (!isSunday) weekMap[weekKey].workedDays++;
+        }
+      } else {
+        if (isSunday) {
+          rangeWeekOff++;
+          weekMap[weekKey].hasSundayOff = true;
         }
       }
     });
 
-    // Enterprise HRMS Standard (Keka / GreytHR): Working on Week Off adds +1.0 full payable day
-    const payableDays = rangeOffice + rangeWFH + rangeLeave + rangeWeekOff + rangeHoliday + (rangeHalfDay * 0.5) + rangeWeekOffDuty;
-    // Dynamic month days division: 30 for 30d month, 31 for 31d month, etc.
-    const overallStats = calculateEmployeeStats(emp.id, attendance, emp.salaryMonthly || 100000, currentMonthDays);
-    const advanceAmount = getEmployeeTotalAdvance(emp.id, advances);
-    const siteAllowance = getEmployeeTotalExpenses(emp.id, expenses, currentMonthPrefix);
-    const netDisbursal = Math.max(0, overallStats.netEstimatedSalary + siteAllowance - advanceAmount);
+    // 6-Day Work Qualification Rule for Paid Weekly Offs (Sunday)
+    let earnedPaidWeekOffs = 0;
+    Object.values(weekMap).forEach((w) => {
+      if (w.workedDays >= 6 && w.hasSundayOff) {
+        earnedPaidWeekOffs++;
+      }
+    });
+
+    // Regular office days excluding rest day duty
+    const regularOffice = Math.max(0, rangeOffice - rangeWeekOffDuty);
+
+    // Standard Enterprise HRMS Payable Days calculation
+    const payableDays = regularOffice + rangeWFH + rangeLeave + earnedPaidWeekOffs + rangeHoliday + (rangeHalfDay * 0.5) + (rangeWeekOffDuty * 2);
+
+    const baseSalary = emp.salaryMonthly || 25000;
+    const periodBaseDays = periodMode === 'month' 
+      ? new Date(selectedYear, selectedMonth + 1, 0).getDate() 
+      : Math.max(1, periodDays);
+
+    const perDaySalary = Math.round((baseSalary / periodBaseDays) * 100) / 100;
+    const hourlyRate = Math.round((perDaySalary / 8) * 100) / 100;
+    const earnedBasic = Math.round(payableDays * perDaySalary);
+    const overtimePay = Math.round(rangeOvertime * hourlyRate * 1.5);
+    const weekOffDutyBonus = Math.round(rangeWeekOffDuty * perDaySalary);
+
+    // Filter advances and site expenses
+    const advanceAmount = getEmployeeTotalAdvance(emp.id, advances, activeMonthPrefix);
+    const siteAllowance = getEmployeeTotalExpenses(emp.id, expenses, activeMonthPrefix);
+
+    const isPfEsic = emp.statutoryType !== 'non_pf_esic';
+    let epf = 0;
+    let esic = 0;
+    if (isPfEsic) {
+      epf = Math.min(Math.round(earnedBasic * 0.12), 1800);
+      if (earnedBasic <= 21000) {
+        esic = Math.round(earnedBasic * 0.0075);
+      }
+    }
+    const pt = periodMode === 'month' ? 200 : 0;
+    const totalDeductions = epf + esic + pt + advanceAmount;
+    const grossEarnings = earnedBasic + overtimePay + weekOffDutyBonus + siteAllowance;
+    const netDisbursal = Math.max(0, grossEarnings - totalDeductions);
+
+    const overallStats = {
+      payableDays,
+      perDaySalary,
+      hourlyRate,
+      overtimePay,
+      lossOfPayDeduction: Math.round(rangeAbsent * perDaySalary),
+      netEstimatedSalary: netDisbursal,
+      epf,
+      esic,
+      pt,
+      totalDeductions
+    };
 
     return {
       ...emp,
-      rangeTotal,
+      rangeTotal: periodDays,
       rangeOffice,
       rangeWFH,
       rangeHalfDay,
       rangeLeave,
       rangeAbsent,
-      rangeWeekOff,
+      rangeWeekOff: earnedPaidWeekOffs,
       rangeHoliday,
       rangeLate,
       rangeWeekOffDuty,
       rangeOvertime: Number(rangeOvertime.toFixed(1)),
       payableDays,
+      earnedSalary: earnedBasic,
       advanceAmount,
       siteAllowance,
       netDisbursal,
@@ -522,17 +675,17 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Payroll Cycle Days</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Report Period Duration</span>
           <div className="mt-1 flex items-baseline gap-1">
-            <span className="text-2xl font-black text-slate-900 dark:text-white">22 Working Days</span>
+            <span className="text-2xl font-black text-slate-900 dark:text-white">{periodDays} Days</span>
           </div>
-          <span className="text-[10px] text-slate-400 font-semibold block mt-1">
-            Excludes Saturdays & Sundays
+          <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold block mt-1 truncate" title={periodTitle}>
+            {periodTitle}
           </span>
         </div>
 
         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/60">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Compliance & Audit Status</span>
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Compliance &amp; Audit Status</span>
           <div className="mt-1 flex items-baseline gap-1">
             <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">100% Verified</span>
           </div>
@@ -542,42 +695,299 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
         </div>
       </div>
 
-      {/* Filter Ribbon */}
-      <div className="no-print flex flex-col sm:flex-row items-center justify-between gap-3">
-        <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search employee in ledger..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 text-xs bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+      {/* Report Period & Filter Toolbar */}
+      <div className="no-print bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+        
+        {/* Row 1: Mode Switcher (Month-Wise vs Custom Range vs Quick Timeline) */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-black text-slate-500 uppercase tracking-wider flex items-center gap-1.5 mr-1">
+              <Calendar className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <span>Report Period:</span>
+            </span>
 
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-medium">Timeline:</span>
-          <div className="flex gap-1 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-800">
-            {[
-              { id: '7', label: '7 Days' },
-              { id: '14', label: '14 Days' },
-              { id: '30', label: '30 Days' },
-              { id: 'all', label: 'All Recorded' }
-            ].map(r => (
+            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl text-xs font-bold">
               <button
-                key={r.id}
-                onClick={() => setRangeFilter(r.id)}
-                className={`px-3 py-1 rounded-xl font-bold transition-all ${
-                  rangeFilter === r.id
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                onClick={() => { sounds.playSuccess(); setPeriodMode('month'); }}
+                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  periodMode === 'month'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                {r.label}
+                <CalendarDays className="w-3.5 h-3.5" />
+                <span>Month-Wise</span>
               </button>
-            ))}
+
+              <button
+                onClick={() => { sounds.playSuccess(); setPeriodMode('custom'); }}
+                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  periodMode === 'custom'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                <span>Custom Period</span>
+              </button>
+
+              <button
+                onClick={() => { sounds.playSuccess(); setPeriodMode('quick'); }}
+                className={`px-3.5 py-1.5 rounded-xl transition-all cursor-pointer flex items-center gap-1.5 ${
+                  periodMode === 'quick'
+                    ? 'bg-blue-600 text-white shadow-md'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Quick Range</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Current Active Period Badge */}
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-[11px] font-bold text-slate-400 uppercase">Active Period:</span>
+            <span className="px-3 py-1 rounded-xl bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 font-black">
+              {periodTitle}
+            </span>
           </div>
         </div>
+
+        {/* Row 2: Dynamic Controls based on selected periodMode */}
+        {periodMode === 'month' && (
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3 flex-wrap">
+            {/* Month Navigator */}
+            <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-2xl p-1 border border-slate-200 dark:border-slate-700 text-xs">
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  if (selectedMonth === 0) {
+                    setSelectedMonth(11);
+                    setSelectedYear(selectedYear - 1);
+                  } else {
+                    setSelectedMonth(selectedMonth - 1);
+                  }
+                }}
+                className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                title="Previous Month"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+
+              {/* Month Dropdown */}
+              <select
+                value={selectedMonth}
+                onChange={(e) => {
+                  sounds.playSuccess();
+                  setSelectedMonth(parseInt(e.target.value, 10));
+                }}
+                className="bg-transparent font-bold text-slate-900 dark:text-white px-2 py-1 outline-none cursor-pointer"
+              >
+                {[
+                  'January', 'February', 'March', 'April', 'May', 'June',
+                  'July', 'August', 'September', 'October', 'November', 'December'
+                ].map((m, idx) => (
+                  <option key={m} value={idx} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold">
+                    {m}
+                  </option>
+                ))}
+              </select>
+
+              {/* Year Dropdown */}
+              <select
+                value={selectedYear}
+                onChange={(e) => {
+                  sounds.playSuccess();
+                  setSelectedYear(parseInt(e.target.value, 10));
+                }}
+                className="bg-transparent font-bold text-slate-900 dark:text-white px-2 py-1 outline-none cursor-pointer border-l border-slate-200 dark:border-slate-700"
+              >
+                {[2024, 2025, 2026, 2027, 2028].map(y => (
+                  <option key={y} value={y} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-white font-semibold">
+                    {y}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  if (selectedMonth === 11) {
+                    setSelectedMonth(0);
+                    setSelectedYear(selectedYear + 1);
+                  } else {
+                    setSelectedMonth(selectedMonth + 1);
+                  }
+                }}
+                className="p-1.5 rounded-xl hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors cursor-pointer"
+                title="Next Month"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Quick Month Jump Buttons */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  setSelectedMonth(now.getMonth());
+                  setSelectedYear(now.getFullYear());
+                }}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  selectedMonth === now.getMonth() && selectedYear === now.getFullYear()
+                    ? 'bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-black'
+                    : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200'
+                }`}
+              >
+                This Month
+              </button>
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                  setSelectedMonth(prev.getMonth());
+                  setSelectedYear(prev.getFullYear());
+                }}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 transition cursor-pointer"
+              >
+                Last Month
+              </button>
+            </div>
+          </div>
+        )}
+
+        {periodMode === 'custom' && (
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-3 flex-wrap text-xs">
+            <div className="flex items-center gap-2">
+              <label className="font-bold text-slate-600 dark:text-slate-400">From Date:</label>
+              <input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-900 dark:text-white"
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <label className="font-bold text-slate-600 dark:text-slate-400">To Date:</label>
+              <input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono font-bold text-slate-900 dark:text-white"
+              />
+            </div>
+
+            {/* Quick shortcuts for custom range */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  const start = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+                  const end = new Date(now.getFullYear(), now.getMonth(), 15).toISOString().split('T')[0];
+                  setCustomStartDate(start);
+                  setCustomEndDate(end);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 text-[11px] cursor-pointer"
+              >
+                1st - 15th
+              </button>
+              <button
+                onClick={() => {
+                  sounds.playSuccess();
+                  const start = new Date(now.getFullYear(), now.getMonth(), 16).toISOString().split('T')[0];
+                  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                  const end = new Date(now.getFullYear(), now.getMonth(), lastDay).toISOString().split('T')[0];
+                  setCustomStartDate(start);
+                  setCustomEndDate(end);
+                }}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 text-[11px] cursor-pointer"
+              >
+                16th - End
+              </button>
+            </div>
+          </div>
+        )}
+
+        {periodMode === 'quick' && (
+          <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center gap-2 flex-wrap text-xs">
+            <span className="text-slate-500 font-semibold">Timeline Presets:</span>
+            <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border border-slate-200 dark:border-slate-700">
+              {[
+                { id: '7', label: 'Last 7 Days' },
+                { id: '14', label: 'Last 14 Days' },
+                { id: '30', label: 'Last 30 Days' },
+                { id: 'all', label: 'All Recorded' }
+              ].map(r => (
+                <button
+                  key={r.id}
+                  onClick={() => { sounds.playSuccess(); setQuickDays(r.id); }}
+                  className={`px-3 py-1 rounded-xl font-bold transition-all cursor-pointer ${
+                    quickDays === r.id
+                      ? 'bg-blue-600 text-white shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Row 3: Employee Search and Department Filter */}
+        <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto flex-1 flex-wrap">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search employee by name, ID, role..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+              />
+            </div>
+
+            {/* Department Dropdown */}
+            <div className="flex items-center gap-1.5">
+              <label className="text-slate-500 dark:text-slate-400 font-bold shrink-0">Dept:</label>
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="p-2 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white font-semibold text-xs outline-none cursor-pointer"
+              >
+                {availableDepartments.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Export & Print Controls */}
+          <div className="flex items-center gap-2 flex-wrap self-end sm:self-center">
+            <button
+              onClick={handleExportPayrollCSV}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/20 transition-all active:scale-95 cursor-pointer"
+              title="Download CSV report for selected period"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Export CSV</span>
+            </button>
+
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-2xl bg-slate-800 hover:bg-slate-700 text-white shadow-md transition-all active:scale-95 cursor-pointer"
+              title="Print attendance report"
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>Print Report</span>
+            </button>
+          </div>
+        </div>
+
       </div>
 
       {/* Official Print Header - SK ENTERPRISES LETTERHEAD */}
@@ -595,8 +1005,12 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
             <p className="text-[10px] text-slate-700 font-medium max-w-xl">
               {config?.companyAddress || '303, Panchsheel chs ltd, plot no 07, sec -02, taloja phase -01, navi mumbai -410208'}
             </p>
-            <p className="text-xs font-bold text-slate-900 mt-1">Official Payroll &amp; Attendance Register • Fiscal Year 2026-2027</p>
-            <p className="text-[10px] text-slate-500">Generated on {new Date().toLocaleDateString()} • Statutory Standard: 22 Working Days Base</p>
+            <p className="text-xs font-bold text-slate-900 mt-1 uppercase">
+              Official Payroll &amp; Attendance Register • Period: {periodTitle}
+            </p>
+            <p className="text-[10px] text-slate-500">
+              Generated on {new Date().toLocaleDateString()} • {periodDays} Days Timeline • Department: {departmentFilter}
+            </p>
           </div>
           <div className="text-right text-xs space-y-1">
             <div className="inline-block px-2.5 py-0.5 rounded bg-slate-950 text-white font-mono text-[9px] font-black uppercase tracking-wider">
@@ -889,7 +1303,7 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
           advances={advances}
           expenses={expenses}
           config={config}
-          monthYear="September 2026"
+          monthYear={`${new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' })} ${selectedYear}`}
           onClose={() => setSelectedPayslipEmp(null)}
         />
       )}
@@ -920,7 +1334,7 @@ _This is a computer-generated salary slip from ${config?.companyName || 'SK ENTE
           advances={advances}
           expenses={expenses}
           config={config}
-          monthYear="September 2026"
+          monthYear={`${new Date(selectedYear, selectedMonth, 1).toLocaleString('default', { month: 'long' })} ${selectedYear}`}
         />
       )}
 
